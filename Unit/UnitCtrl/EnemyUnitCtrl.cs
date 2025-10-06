@@ -7,73 +7,50 @@ using System.IO;
 using System;
 using System.Text;
 using System.Linq;
-using static CommonData;
-using static CommonFunc;
-using static PlayerKeyCtrl;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
+using static PlayerKeyHelper;
 using static PlayerSaveData;
 using static GameConfig;
 
 public class EnemyUnitCtrl : UnitCtrlBase
 {
-    public virtual void HandleHpEmpty()
+    public EnemyUnitCtrl(UnitCtrlObj unitCtrlObj) : base(unitCtrlObj)
     {
-        HandleDead();
     }
 
-    public void Attacked(PlayerShotUnitCtrl playerShotUnitCtrl)
+    public EnemyUnitProp enemyProp
     {
-        if (playerShotUnitCtrl == null)
-        {
-            Debug.LogWarning("ShotUnitCtrl is null in HandleAttacked.");
-            return;
-        }
-        var playerShotUnitProp = playerShotUnitCtrl.unitProp as PlayerShotUnitProp;
-        if (playerShotUnitProp == null)
-        {
-            Debug.LogWarning("UnitProp is not of type PlayerShotUnitProp in HandleAttacked.");
-            return;
-        }
-
-        var enemyUnitProp = unitProp as EnemyUnitProp;
-        if (enemyUnitProp == null)
-        {
-            Debug.LogWarning("UnitProp is not of type EnemyUnitProp in HandleAttacked.");
-            return;
-        }
-
-        OnCostHp(enemyUnitProp, playerShotUnitProp.dmg);
-        if (enemyUnitProp.hp == 0)
-            HandleHpEmpty();
+        get => (EnemyUnitProp)unitProp;
+        set => unitProp = value;
     }
 
-    public override void CustomizeDeadHandle()
+    public override void Unit3_TriggerDead_OnWaitAni()
     {
+        base.Unit3_TriggerDead_OnWaitAni();
         GivePower();
+    }
+    public void GivePower(uint PowerGiveNum)
+    {
+        for (int i = 0; i < PowerGiveNum; i++)
+        {
+            var unitCtrl = GameSelect.powerData.powerCreateStageSettings[i];
+            unitProp.propWaitDebutByCreateSettings.Add((unitCtrl));
+        }
     }
 
     public void GivePower()
     {
-        if (GameSystem.Instance.isPractice || createSetting == null || coreSetting.powerGive == 0)
+        if (GameSelect.isPracticeMode)
             return;
 
-        var PowerGiveList = coreSetting.powerGive;
-        for (int i = 0; i < PowerGiveList; i++)
-        {
-            var unit = GameSystem.Instance.powerCreateStageSettings[i];
-            GameSystem.Instance.waitCreates += () =>
-            {
-                GameSystem.Instance.CreateUnit(unit, this);
-            };
-        }
-    }
+        if (createStageSetting == null)
+            return;
+        if (coreSetting.powerGive == null || coreSetting.powerGive == 0)
+            return;
 
-
-    public virtual void OnCostHp(EnemyUnitProp enemyUnitProp, uint dmg)
-    {
-        var oldHp = enemyUnitProp.hp;
-        var costHp = dmg;
-
-        if (costHp > oldHp) enemyUnitProp.hp = 0;
-        else enemyUnitProp.hp -= costHp;
+        var PowerGiveNum = coreSetting.powerGive;
+        GivePower(PowerGiveNum.Value);
     }
 }

@@ -2,18 +2,19 @@ using UnityEngine;
 using UnityEngine.UI;
 using System;
 using System.Linq;
-using static CommonData;
-using static CommonFunc;
-using static PlayerKeyCtrl;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
+using static PlayerKeyHelper;
 using static PlayerSaveData;
 using static GameConfig;
 using System.Collections.Generic;
 
 public class KeyBoardSelect : SelectBase<KeyBoardSelect, KeyOption>
 {
-    List<KeyBoardSaveData> keyBoardSaveData;
+    List<KeyBoardSaveData> tmpKeyBoardSaveData;
     bool isWaitInput = false;
-    protected override void ClickExtraHandle()
+    protected override void ClickHandle()
     {
         foreach (KeyCode keycode in Enum.GetValues(typeof(KeyCode)))
         {
@@ -23,18 +24,18 @@ public class KeyBoardSelect : SelectBase<KeyBoardSelect, KeyOption>
                 {
                     nowBtn.text.color = Color.white;
                     nowBtn.text.text = keycode.ToString();
-                    var keyBoardData = keyBoardSaveData.FirstOrDefault(r => r.baseKey == nowBtn.keyCode);
+                    var keyBoardData = tmpKeyBoardSaveData.FirstOrDefault(r => r.baseKey == nowBtn.keyCode);
                     keyBoardData.setKey = keycode;
                     isWaitInput = false;
                     break;
                 }
-                if (GetSetKey(KeyCode.UpArrow, keyBoardSaveData) != keycode && GetSetKey(KeyCode.DownArrow, keyBoardSaveData) != keycode
-                && GetSetKey(KeyCode.LeftArrow, keyBoardSaveData) != keycode && GetSetKey(KeyCode.RightArrow, keyBoardSaveData) != keycode
-                && GetSetKey(KeyCode.X, keyBoardSaveData) != keycode && GetSetKey(KeyCode.Escape, keyBoardSaveData) != keycode)
+                if (TransferToTmpSetKey(KeyCode.UpArrow, tmpKeyBoardSaveData) != keycode && TransferToTmpSetKey(KeyCode.DownArrow, tmpKeyBoardSaveData) != keycode
+                && TransferToTmpSetKey(KeyCode.LeftArrow, tmpKeyBoardSaveData) != keycode && TransferToTmpSetKey(KeyCode.RightArrow, tmpKeyBoardSaveData) != keycode
+                && TransferToTmpSetKey(KeyCode.X, tmpKeyBoardSaveData) != keycode && TransferToTmpSetKey(KeyCode.Escape, tmpKeyBoardSaveData) != keycode)
                 {
                     if (nowBtn.name == TextName.儲存並返回)
                     {
-                        PlayerSaveData.keyBoardSaveData = keyBoardSaveData;
+                        PlayerSaveData.keyBoardSaveDatas = tmpKeyBoardSaveData;
                         SaveKeyBoardData();
                         Hide();
                         TitleSelect.Instance.Show();
@@ -43,7 +44,7 @@ public class KeyBoardSelect : SelectBase<KeyBoardSelect, KeyOption>
                     {
                         Hide();
                         TitleSelect.Instance.Show();
-                        LoadData();
+                        UseKeyBoardSaveDatas();
                     }
                     else
                     {
@@ -52,27 +53,27 @@ public class KeyBoardSelect : SelectBase<KeyBoardSelect, KeyOption>
                     }
                     break;
                 }
-                else if (GetSetKey(KeyCode.X, keyBoardSaveData) == keycode)
+                else if (TransferToTmpSetKey(KeyCode.X, tmpKeyBoardSaveData) == keycode)
                 {
                     Hide();
                     TitleSelect.Instance.Show();
-                    LoadData();
+                    UseKeyBoardSaveDatas();
                     break;
                 }
             }
         }
     }
 
-    public void LoadData()
+    public void UseKeyBoardSaveDatas()
     {
-        keyBoardSaveData = new List<KeyBoardSaveData>();
+        tmpKeyBoardSaveData = new List<KeyBoardSaveData>();
         foreach (var btn in btns)
         {
             if (btn.keyCode == KeyCode.None)
                 continue;
-            var setKey = PlayerSaveData.keyBoardSaveData.FirstOrDefault(r => r.baseKey == btn.keyCode).setKey;
+            var setKey = PlayerSaveData.keyBoardSaveDatas.FirstOrDefault(r => r.baseKey == btn.keyCode).setKey;
             btn.text.text = setKey.ToString();
-            keyBoardSaveData.Add(new KeyBoardSaveData()
+            tmpKeyBoardSaveData.Add(new KeyBoardSaveData()
             {
                 baseKey = btn.keyCode,
                 setKey = setKey,

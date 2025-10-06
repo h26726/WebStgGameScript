@@ -2,302 +2,245 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
-using static CommonData;
-using static CommonFunc;
-using static PlayerKeyCtrl;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
+using static PlayerKeyHelper;
 using static GameConfig;
 using UnityEngine.UI;
 using System;
 using Unity.VisualScripting;
 using System.IO;
-public abstract partial class UnitCtrlBase : MonoBehaviour, IUnitCtrlData
+
+public abstract partial class UnitCtrlBase
 {
-    public string paramPoolName { get; set; } 
-    public uint takeDictKeyNo { get; set; }
-    public float zIndex { get; set; } = 0;
-    public bool isAllowCollision { get; set; }
-    public event Action eventMoveVectorCal;
-    public void RunEventMoveVectorCal()
+    public UnitCtrlObj unitCtrlObj { get; set; }
+    public enum UpdateFlag
     {
-        if (eventMoveVectorCal != null)
-            eventMoveVectorCal.Invoke();
+        None = 0,
+        OutToInBorder = 1 << 0,
+        InToOutBorder = 1 << 1,
+        WaitDead = 1 << 2,
+    }
+    UpdateFlag updateFlag = UpdateFlag.None;
+    public UnitPropBase unitProp { get; set; }
+
+
+    public string externalPoolName { get; set; }
+    public uint debutNo { get; set; }
+    public uint endDeadAniTime { get; set; }
+
+
+
+    public UnitCtrlBase(UnitCtrlObj unitCtrlObj)
+    {
+        this.unitCtrlObj = unitCtrlObj;
+        Reset();
     }
 
-    public event Action eventBorderHandle;
-    public void RunEventBorderHandle()
+    // public bool isRestoreQueue { get; set; }
+    // public bool isDeadQueue { get; set; }
+    public void Reset()
     {
-        if (eventBorderHandle != null)
-            eventBorderHandle.Invoke();
+        updateFlag |= UpdateFlag.None;
+        uTime = 0;
+        parentUnitCtrl = null;
+        createStageSetting = null;
+        actCtrlDict.Clear();
+        if (unitProp == null)
+            unitProp = UnitPropFactory.Create(this);
+        unitProp.Reset();
+        unitCtrlObj.Reset();
     }
-
-
-    public bool isRestoreQueue { get; set; }
-    public bool isDeadQueue { get; set; }
-
-
 
     public UnitCtrlBase parentUnitCtrl { get; set; }
-    public CreateStageSetting createSetting { get; set; }
+    public CreateStageSetting createStageSetting { get; set; }
     public Dictionary<uint, ActCtrl> actCtrlDict = new Dictionary<uint, ActCtrl>();
-    public UnitPropBase unitProp { get; set; }
-    protected string zCode { get; set; } = "";
-    public SettingBase coreSetting { get { return createSetting.coreSetting; } }
+    // public UnitPropBase unitProp { get; set; }
+    public SettingBase coreSetting { get { return createStageSetting.coreSetting; } }
 
-
-
-    protected Text log { get; set; }
-    protected string logStr { get; set; }
-    protected Collider2D colliderComponent { get; set; }
-    public SpriteRenderer spriteRenderer { get; set; }
-    public CollisionCtrlBase mainObjCtrl { get; set; }
     public Transform childFrame { get; set; }
-    public List<UnitCtrlBase> childFrameUnits { get; set; } = new List<UnitCtrlBase>();
-    public Animator animator { get; set; }
+
+    public uint uTime { get; set; }
+    public bool isRun { get; set; }
 
 
 
-    void Awake()
+
+    public void DebutUpdateHandler()
     {
-        if (transform.childCount < 2 || transform.GetChild(0).transform.childCount < 1)
+        uTime++;
+        if (updateFlag.HasFlag(UpdateFlag.OutToInBorder) && uTime % 10 == 0)
         {
-            Debug.LogError($"{GetType().Name} childCount Error");
+            TryOutToInBorderIntoNext();
         }
-        gameObject.transform.position = new Vector3(GameConfig.POOL_RESET_POS.x, GameConfig.POOL_RESET_POS.y, zIndex);
-        spriteRenderer = transform.GetChild(0).transform.GetChild(0).GetComponent<SpriteRenderer>();
-        mainObjCtrl = transform.GetChild(0).GetComponent<CollisionCtrlBase>();
-        colliderComponent = transform.GetChild(0).GetComponent<Collider2D>();
-        childFrame = transform.GetChild(1);
-        log = GetComponent<Text>();
-        animator = GetComponent<Animator>();
-        CustomizeAwake();
-        ResetParam();
+        else if (updateFlag.HasFlag(UpdateFlag.InToOutBorder) && uTime % 10 == 0)
+        {
+            TryInToOutBorderRestore();
+        }
+
+        if (actCtrlDict != null && actCtrlDict.Count > 0)
+        {
+            unitCtrlObj.SetBeforePos();
+            unitCtrlObj.actionTimeText.text = "";
+            foreach (var actCtrlPair in actCtrlDict)
+            {
+                var actCtrl = actCtrlPair.Value;
+                if (actCtrl.isRun)
+                {
+                    actCtrl.UpdateHandler();
+                }
+            }
+        }
     }
 
-    public virtual void CustomizeAwake()
-    {
 
+
+    public void TryDeadUpdateHandler()
+    {
+        if (unitProp.isTriggerDead)
+        {
+            Unit3_TriggerDead_OnWaitAni();
+        }
+        else if (updateFlag.HasFlag(UpdateFlag.WaitDead) && GameReplay.keyPressTime == endDeadAniTime)
+        {
+            unitProp.isTriggerRestore = true;
+            // DeadAnimEndHandle();
+        }
     }
 
-    public void CreateUnitAndSet(CreateStageSetting createStageSetting, UnitCtrlBase parentUnitCtrl = null)
+    public bool TryRestoreUpdateHandler()
     {
-        SetCreateSetting(createStageSetting, parentUnitCtrl);
-        EnableUnit();
-        BorderTriggerForEvent();
+        if (unitProp.isTriggerRestore)
+        {
+            unitProp.isTriggerRestore = false;
+            unitProp.isTriggerDead = false;
+            Unit4_ResetAndRestore();
+            return true;
+        }
+        return false;
+    }
+
+    public void Unit1_SetVal_OnOutToIn(CreateStageSetting createStageSetting, UnitCtrlBase parentUnitCtrl = null)
+    {
+        this.createStageSetting = createStageSetting;
+        unitCtrlObj.Set_zIndex_zCode(createStageSetting.Id);
+
+        this.actCtrlDict = ActCtrlFactory.CreateActCtrlDict(this);
+        SetParent(parentUnitCtrl);
+
+
+        if (this != GameBoss.nowUnit && this != GamePlayer.nowUnit && unitProp.restoreDistance < GameConfig.RESTORE_DISTANCE_MAX)
+        {
+            updateFlag |= UpdateFlag.OutToInBorder;
+        }
+        unitCtrlObj.EnableUnit();
+        Unit2_TriggerCoreAct();
+    }
+
+    void SetParent(UnitCtrlBase parentUnitCtrl)
+    {
+        if (parentUnitCtrl == null)
+            return;
+        this.parentUnitCtrl = parentUnitCtrl;
+        this.unitCtrlObj.SetParent(parentUnitCtrl.unitCtrlObj);
+        this.unitProp.SetParent(parentUnitCtrl);
+    }
+
+    public void Unit2_TriggerCoreAct()
+    {
         if (actCtrlDict.ContainsKey(coreSetting.Id))
         {
-            OnActive(actCtrlDict[coreSetting.Id]);
+            unitProp.propWaitCallActs.Add((coreSetting.Id, coreSetting.Id, null));
+            // actCtrlDict[coreSetting.Id].Act1_RunAndReset();
         }
         else
             Debug.LogError($"ActCtrlDict does not contain CoreSetting.Id: {coreSetting.Id}" +
                 $"  ActCtrlDict.Count = {actCtrlDict.Count} ");
     }
 
-    public void SetCreateSetting(CreateStageSetting createStageSetting, UnitCtrlBase parentUnitCtrl = null)
-    {
-        createSetting = createStageSetting;
-        this.parentUnitCtrl = parentUnitCtrl;
-        actCtrlDict = ActCtrlFactory.CreateActCtrlDict(this);
-        unitProp = UnitPropFactory.Create(this);
-        zCode = coreSetting.Id.ToString() + "_z" + zIndex * 1000f;
 
-        //延續父紀錄
-        if (parentUnitCtrl != null)
+    private void TryInToOutBorderRestore()
+    {
+        if (unitCtrlObj.IsOutBorder(unitProp.restoreDistance))
         {
-            if (parentUnitCtrl.recordAngleDict.Count > 0)
-                recordAngleDict = new Dictionary<uint, float>(parentUnitCtrl.recordAngleDict);
-            if (parentUnitCtrl.recordPosDict.Count > 0)
-                recordPosDict = new Dictionary<uint, Vector2>(parentUnitCtrl.recordPosDict);
-        }
-        PrintCreate();
-    }
-    void EnableUnit()
-    {
-        gameObject.SetActive(true);
-        enabled = true;
-        transform.SetAsLastSibling();
-    }
-    private void BorderTriggerForEvent()
-    {
-        eventBorderHandle = null;
-        eventBorderHandle += BorderEnterAction;
-    }
-
-    private void BorderEnterAction()
-    {
-        uTime++;
-        if (uTime % 10 != 0) return;
-
-        if (!CheckOutBorder())
-        {
-            eventBorderHandle -= BorderEnterAction;
-            eventBorderHandle += BorderOutAction;
+            updateFlag &= ~UpdateFlag.InToOutBorder;
+            unitProp.isTriggerRestore = true;
         }
     }
 
-    private void BorderOutAction()
+    private void TryOutToInBorderIntoNext()
     {
-        uTime++;
-        if (uTime % 10 != 0) return;
+        if (!unitCtrlObj.IsOutBorder(unitProp.restoreDistance))
+        {
+            updateFlag &= ~UpdateFlag.OutToInBorder;
+            updateFlag |= UpdateFlag.InToOutBorder;
+        }
+    }
 
-        if (CheckOutBorder())
+
+
+    public virtual void Unit3_TriggerDead_OnWaitAni()
+    {
+        unitProp.isTriggerDead = false;
+        unitProp.isAllowCollision = false;
+        unitCtrlObj.PlayDeadAni();
+        endDeadAniTime = GameReplay.keyPressTime + DEFAULT_DEADANI_KEY_TIME;
+        updateFlag |= UpdateFlag.WaitDead;
+        if (this == GamePlayer.nowUnit)
+        {
+            endDeadAniTime = GameReplay.keyPressTime + DEFAULT_PLAYER_DEADANI_KEY_TIME;
+            unitProp.isInvincible = true;
+            GamePlayer.nowUnit.playerCtrlObj.core.SetActive(false);
+            GamePlayer.DeadCost();
+        }
+        else
+        {
+            actCtrlDict.Clear();
+            unitCtrlObj.LeaveRelatParent();
+        }
+    }
+
+    public void Unit4_ResetAndRestore()
+    {
+        if (this == GamePlayer.nowUnit)
+        {
+            if (GamePlayer.life == 0)
+            {
+                GamePlayer.nowUnit.HandlePlayerHpEmpty();
+            }
+            GamePlayer.CoreActionRun();
+        }
+        else
         {
             TriggerRestore();
-            eventBorderHandle -= BorderOutAction;
         }
     }
 
-    public virtual void OnActive(ActCtrl actCtrl, ActCtrl parentActCtrl = null)
+
+    public static UnitCtrlBase GetOutSideUnit(uint id)
     {
-        var setting = actCtrl.stageSetting;
-        unitProp.Active(setting, this); ;
-        Active(setting);
-        OnActiveActCtrl(actCtrl, parentActCtrl);
-    }
-
-    public virtual void OnActiveActCtrl(ActCtrl actCtrl, ActCtrl parentActCtrl = null)
-    {
-        isAllowCollision = true;
-        actCtrl.Active(parentActCtrl);
-        eventMoveVectorCal -= ActiveMoveVectorCal;
-        eventMoveVectorCal += ActiveMoveVectorCal;
-    }
-
-
-    void ActiveMoveVectorCal()
-    {
-        var moveVector = actCtrlDict.Values.Select(r => r.moveVector).Aggregate(Vector2.zero, (acc, v) => acc + v);
-        unitProp.moveAngle = Mathf.Atan2(moveVector.y, moveVector.x) * Mathf.Rad2Deg;
-        unitProp.speed = moveVector.magnitude * 60f;
-    }
-
-    protected virtual void ActiveActCtrlCustomize(SettingBase stageSetting)
-    {
-    }
-
-
-    public virtual void OnActTimeEndCustomize()
-    {
-    }
-
-    public virtual bool CheckOutBorder(Vector2? Pos = null)
-    {
-        if (Pos == null)
+        if ((IdVal)id == IdVal.Player)
         {
-            Pos = transform.position;
+            return GamePlayer.nowUnit;
         }
-        return CheckOutBorderDis(Pos, unitProp.restoreDistance);
-    }
-
-    public virtual void HandleDead()
-    {
-        isAllowCollision = false;
-        ClearEvent();
-        CustomizeDeadHandle();
-        transform.SetParent(LoadingCtrl.Instance.pool.transform);
-        transform.rotation = Quaternion.Euler(0f, 0f, 0f);
-        PlayDeadAnim();
-    }
-
-    public virtual void CustomizeDeadHandle()
-    {
-
-    }
-
-    public virtual void PlayDeadAnim()
-    {
-        var endDeadAniTime = GameSystem.Instance.keyTime + DEFAULT_DEADANI_KEY_TIME;
-        if (animator != null)
-            animator.Play("Dead");
-        Action selfAction = null;
-        selfAction += () =>
+        else if ((IdVal)id == IdVal.Boss)
         {
-            if (GameSystem.Instance.keyTime == endDeadAniTime)
-            {
-                isDeadQueue = false;
-                TriggerRestore();
-                GameSystem.Instance.waitDeadAnis -= selfAction;
-                DeadAnimEndHandle();
-            }
-        };
-        GameSystem.Instance.waitDeadAnis += selfAction;
-    }
-
-    public virtual void DeadAnimEndHandle()
-    {
-        DeadAnimEndCustomize();
-        TriggerRestore();
-    }
-
-    public virtual void DeadAnimEndCustomize()
-    {
-
-    }
-
-
-    public void RestoreIntoPool()
-    {
-        isRestoreQueue = false;
-        ResetParam();
-        ClearEvent();
-        if (animator != null)
-            animator.Play("Idle");
-        gameObject.SetActive(false);
-
-        childFrameUnits = new List<UnitCtrlBase>();
-        transform.SetParent(LoadingCtrl.Instance.pool.transform);
-        transform.rotation = Quaternion.Euler(0f, 0f, 0f);
-        transform.SetAsFirstSibling();
-
-
-        gameObject.transform.position = new Vector3(GameConfig.POOL_RESET_POS.x, GameConfig.POOL_RESET_POS.y, zIndex);
-
-        GameSystem.Instance.takeDict.Remove(takeDictKeyNo);
-        LoadingCtrl.Instance.pool.objectDict[paramPoolName].Push(this);
-        RestoreInToPoolCustomize();
-    }
-
-    protected virtual void RestoreInToPoolCustomize()
-    {
-
-    }
-
-    public void ClearEvent()
-    {
-        eventMoveVectorCal = null;
-        eventBorderHandle = null;
-        foreach (var actCtrl in actCtrlDict.Values)
-        {
-            ClearAllAction(actCtrl);
+            return GameBoss.nowUnit;
         }
-
+        else if (GameDebut.coreDictById.ContainsKey(id))
+        {
+            return GameDebut.coreDictById[id];
+        }
+        Debug.LogError("GetOutSideUnit id not exist:" + id);
+        return null;
     }
 
-    public virtual void ResetParam()
+    public void TriggerRestore()
     {
-        logStr = "";
-        log.text = "";
-
-        parentUnitCtrl = null;
-        createSetting = null;
-        isAllowCollision = false;
-
-        actCtrlDict = new Dictionary<uint, ActCtrl>();
-        recordPosDict = new Dictionary<uint, Vector2>();
-        recordAngleDict = new Dictionary<uint, float>();
-
-        zCode = "";
-        uTime = 0;
-        SetRotateZ(0);
-        SetChildRotateZ(0);
-        CustomizeReset();
+        // Debug.Log(nameof(TriggerRestore));
+        GameDebut.AddQueueRestore(this);
     }
-
-    protected virtual void CustomizeReset()
-    {
-
-    }
-
-
 
 
 }

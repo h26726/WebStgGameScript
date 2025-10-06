@@ -2,42 +2,43 @@ using UnityEngine;
 using UnityEngine.UI;
 using System;
 using System.Linq;
-using static CommonData;
-using static CommonFunc;
-using static PlayerKeyCtrl;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
+using static PlayerKeyHelper;
 using static PlayerSaveData;
 using static GameConfig;
 using System.Collections.Generic;
 public class PracticeSelect : SelectBase<PracticeSelect, PracticeOption>
 {
-    protected override void ClickExtraHandle()
+    protected override void ClickHandle()
     {
-        
-        if (Input.GetKeyDown(GetSetKey(KeyCode.Z)))
+
+        if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.Z)))
         {
             Hide();
-            GameSystem.Instance.selectPracticeId = nowBtn.practiceId;
-            LoadingCtrl.Instance.SwitchPage(LoadingCtrl.PageIndex.Game);
+            GameSelect.practiceId = nowBtn.practiceId;
+            LoadCtrl.Instance.SwitchPage(PageIndex.Game);
 
         }
-        else if (Input.GetKeyDown(GetSetKey(KeyCode.X)))
+        else if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.X)))
         {
             Hide();
             DifficultSelect.Instance.Show();
         }
     }
 
-    public void LoadData()
+    public void UseVersionData()
     {
         foreach (var btn in btns)
         {
-            if (LoadingCtrl.Instance.practiceSettings.ContainsKey(btn.practiceId))
+            if (LoadCtrl.Instance.selectVersionData.practiceSettings.Any(r => r.Id == btn.practiceId))
             {
                 if (btn.text == null)
                 {
                     btn.text = btn.animator.gameObject.GetComponent<Text>();
                 }
-                btn.text.text = LoadingCtrl.Instance.practiceSettings[btn.practiceId].name;
+                btn.text.text = LoadCtrl.Instance.selectVersionData.practiceSettings.First(r => r.Id == btn.practiceId).name;
             }
             else
             {

@@ -2,9 +2,10 @@ using UnityEngine;
 using UnityEngine.UI;
 using System;
 using System.Linq;
-using static CommonData;
-using static CommonFunc;
-using static PlayerKeyCtrl;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
+using static PlayerKeyHelper;
 using static PlayerSaveData;
 using static GameConfig;
 using System.Collections.Generic;
@@ -51,8 +52,9 @@ public class ReplaySelect : SelectBase<ReplaySelect, ReplayOption>
     bool isInputText = false;
 
 
-    protected override void AwakeHandle()
+    protected override void Init()
     {
+        base.Init();
         foreach (var btn in btns)
         {
             btn.line = new Text[4];
@@ -64,7 +66,7 @@ public class ReplaySelect : SelectBase<ReplaySelect, ReplayOption>
                     btn.inputField = btn.animator.gameObject.transform.GetChild(i).GetChild(1).GetComponent<InputField>();
                     btn.inputField.characterLimit = 15;
                     btn.inputField.interactable = false;
-                    btn.inputField.onValidateInput += ValidateEnglishOnly;
+                    btn.inputField.onValidateInput += ValidateTextHandle;
                 }
                 else
                 {
@@ -92,50 +94,49 @@ public class ReplaySelect : SelectBase<ReplaySelect, ReplayOption>
             EventSystem.current.SetSelectedGameObject(null);  // ❗清除目前選取的 UI
             if (Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Return))
             {
-                GameSystem.Instance.replaySaveData.No = nowBtn.no;
-                GameSystem.Instance.replaySaveData.time = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss");
-                GameSystem.Instance.replaySaveData.name = nowBtn.inputField.text;
+                GameReplay.InputSaveData.No = nowBtn.no;
+                GameReplay.InputSaveData.time = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss");
+                GameReplay.InputSaveData.name = nowBtn.inputField.text;
                 PlayerSaveData.SaveReplayData();
             }
-            LoadPage();
+            UseReplaySaveDatas();
         }
 
     }
-    protected override bool CheckBlockAndSpecialHandle()
+    public override void UpdateHandler()
     {
         if (isInputText)
         {
             InputTextHandle();
-            return true;
+            return;
         }
-        return false;
-
+        base.UpdateHandler();
     }
 
-    protected override void ClickExtraHandle()
+    protected override void ClickHandle()
     {
-        if (Input.GetKeyDown(GetSetKey(KeyCode.LeftArrow)) && nowPage > 1)
+        if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.LeftArrow)) && nowPage > 1)
         {
             nowPage -= 1;
-            LoadPage();
+            UseReplaySaveDatas();
         }
-        else if (Input.GetKeyDown(GetSetKey(KeyCode.RightArrow)) && nowPage < 10)
+        else if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.RightArrow)) && nowPage < 10)
         {
             nowPage += 1;
-            LoadPage();
+            UseReplaySaveDatas();
         }
-        else if (Input.GetKeyDown(GetSetKey(KeyCode.Z)))
+        else if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.Z)))
         {
             if (IsRead)
             {
                 Hide();
                 var ReplayData = PlayerSaveData.replaySaveDatas.FirstOrDefault(r => r.No == nowBtn.no);
-                GameSystem.Instance.isReplay = true;
-                GameSystem.Instance.selectDifficult = ReplayData.selectDifficult;
-                GameSystem.Instance.selectPracticeId = ReplayData.selectPracticeId;
-                GameSystem.Instance.playReplayKeys = ReplayData.replayKeys;
-                GameSystem.Instance.playReplayMaxKeyTime = (uint)ReplayData.replayKeys.Max(r => r.keyTime);
-                LoadingCtrl.Instance.SwitchPage(LoadingCtrl.PageIndex.Game);
+                GameSelect.difficult = ReplayData.selectDifficult;
+                GameSelect.practiceId = ReplayData.selectPracticeId;
+                GameReplay.playKeys = ReplayData.replayKeys;
+                GameReplay.playMaxKeyPressTime = (uint)ReplayData.replayKeys.Max(r => r.keyPressTime);
+                LoadCtrl.Instance.gameState = GameSceneState.Stop;
+                LoadCtrl.Instance.SwitchPage(PageIndex.Game);
             }
             else
             {
@@ -147,7 +148,7 @@ public class ReplaySelect : SelectBase<ReplaySelect, ReplayOption>
                 nowBtn.inputField.ActivateInputField();
             }
         }
-        else if (Input.GetKeyDown(GetSetKey(KeyCode.X)))
+        else if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.X)))
         {
             Hide();
             Back();
@@ -155,7 +156,7 @@ public class ReplaySelect : SelectBase<ReplaySelect, ReplayOption>
 
     }
 
-    private char ValidateEnglishOnly(string text, int charIndex, char addedChar)
+    private char ValidateTextHandle(string text, int charIndex, char addedChar)
     {
         if ((addedChar >= 'a' && addedChar <= 'z') ||
             (addedChar >= 'A' && addedChar <= 'Z') ||
@@ -170,7 +171,7 @@ public class ReplaySelect : SelectBase<ReplaySelect, ReplayOption>
         }
     }
 
-    public void LoadPage()
+    public void UseReplaySaveDatas()
     {
         var replayDatas = PlayerSaveData.replaySaveDatas.Where(r => r.No > (nowPage - 1) * 10 && r.No <= nowPage * 10).ToList();
 

@@ -2,18 +2,19 @@ using UnityEngine;
 using UnityEngine.UI;
 using System;
 using System.Linq;
-using static CommonData;
-using static CommonFunc;
-using static PlayerKeyCtrl;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
+using static PlayerKeyHelper;
 using static PlayerSaveData;
 using static GameConfig;
 using System.Collections.Generic;
 public class YesNoSelect : SelectBase<YesNoSelect, TextOption>
 {
-    protected override void ClickExtraHandle()
+    protected override void ClickHandle()
     {
         
-        if (Input.GetKeyDown(GetSetKey(KeyCode.Z)))
+        if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.Z)))
         {
             Hide();
             switch (nowBtn.name)

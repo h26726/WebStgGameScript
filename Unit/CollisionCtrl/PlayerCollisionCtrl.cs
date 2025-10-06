@@ -7,32 +7,28 @@ using System.IO;
 using System;
 using System.Text;
 using System.Linq;
-using static CommonData;
-using static CommonFunc;
-using static PlayerKeyCtrl;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
+using static PlayerKeyHelper;
 using static PlayerSaveData;
 using static GameConfig;
 
 public class PlayerCollisionCtrl : CollisionCtrlBase
 {
-    protected virtual void OnTriggerStay2D(Collider2D collision)
+    protected void OnTriggerStay2D(Collider2D opponentCollision)
     {
-        TriggerHandle(collision);
+        CollisionHandle(opponentCollision);
     }
-    protected override void Attacked(UnitCtrlBase attackerUnitCtrl)
+    protected override void Attacked(UnitCtrlBase opponentUnitCtrl)
     {
-        if (unitCtrlBase.unitProp.isInvincible == true || !attackerUnitCtrl.isAllowCollision)
-            return;
-        if (attackerUnitCtrl.isDeadQueue || attackerUnitCtrl.isRestoreQueue)
-            return;
-        if (attackerUnitCtrl is EnemyShotUnitCtrl)
+        if (unitCtrl.unitProp.isInvincible != true && opponentUnitCtrl is EnemyShotUnitCtrl)
         {
-            unitCtrlBase.HandleDead();
+            unitCtrl.unitProp.isTriggerDead = true;
         }
-        else if (attackerUnitCtrl is PowerUnitCtrl)
+        else if (opponentUnitCtrl is PowerUnitCtrl)
         {
-            GameSystem.Instance.playePower += GameConfig.PLAYER_EVERY_POWER_GET;
-            GameSystem.Instance.playePower = Mathf.Round(GameSystem.Instance.playePower * 100f) / 100f;
+            GamePlayer.GetPower();
         }
     }
 }

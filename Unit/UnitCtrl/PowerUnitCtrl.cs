@@ -7,13 +7,16 @@ using System.IO;
 using System;
 using System.Text;
 using System.Linq;
-using static CommonData;
-using static CommonFunc;
-using static PlayerKeyCtrl;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
+using static PlayerKeyHelper;
 using static PlayerSaveData;
 using static GameConfig;
 
-public class PowerUnitCtrl: UnitCtrlBase
+public class PowerUnitCtrl : UnitCtrlBase
 {
-
+    public PowerUnitCtrl(UnitCtrlObj unitCtrlObj) : base(unitCtrlObj)
+    {
+    }
 }

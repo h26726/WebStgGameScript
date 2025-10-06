@@ -1,8 +1,9 @@
 using UnityEngine;
-using static CommonData;
-using static CommonFunc;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
 using static GameConfig;
-using static PlayerKeyCtrl;
+using static PlayerKeyHelper;
 using static PlayerSaveData;
 using System;
 using System.Linq;
@@ -50,6 +51,6 @@ public class ReplayOption : OptionBase
     public Text[] line { get; set; }
     public uint no { get; set; }
     public InputField inputField { get; set; }
-    public PlayerSaveData.ReplayDataClass replayData { get; set; }
+    public PlayerSaveData.ReplaySaveData replayData { get; set; }
 }
 

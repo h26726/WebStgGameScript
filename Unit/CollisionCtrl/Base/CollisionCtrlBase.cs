@@ -7,48 +7,50 @@ using System.IO;
 using System;
 using System.Text;
 using System.Linq;
-using static CommonData;
-using static CommonFunc;
-using static PlayerKeyCtrl;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
+using static PlayerKeyHelper;
 using static PlayerSaveData;
 using static GameConfig;
 
 public abstract class CollisionCtrlBase : MonoBehaviour
 {
-    public UnitCtrlBase unitCtrlBase { get; set; }
+    public UnitCtrlBase unitCtrl { get; set; }
+
+
     void Awake()
     {
-        unitCtrlBase = transform.parent.GetComponent<UnitCtrlBase>();
+    }
+    public void Init(UnitCtrlBase unitCtrl)
+    {
+        this.unitCtrl = unitCtrl;
     }
 
-    protected virtual void TriggerHandle(Collider2D collision)
+    protected void CollisionHandle(Collider2D opponentCollision)
     {
-        var attackerUnitCtrl = collision.GetComponent<CollisionCtrlBase>().unitCtrlBase;
-        var shotUnitCtrl = attackerUnitCtrl as ShotUnitCtrl;
-
-        Attacked(attackerUnitCtrl);
-
-        //敵彈回收
-        TargetDeadHandle(shotUnitCtrl, attackerUnitCtrl.TriggerDead);
-
-    }
-
-    protected void TargetDeadHandle(ShotUnitCtrl shotUnitCtrl, Action triggerDead)
-    {
-        if (shotUnitCtrl == null) //非子彈直接回收
-        {
-            triggerDead();
+        if (unitCtrl.unitProp.isDead || !unitCtrl.unitProp.isAllowCollision)
             return;
+        var opponentUnitCtrl = opponentCollision.GetComponent<CollisionCtrlBase>().unitCtrl;
+        if (opponentUnitCtrl.unitProp.isDead || !opponentUnitCtrl.unitProp.isAllowCollision)
+            return;
+        Attacked(opponentUnitCtrl);
+
+        if (opponentUnitCtrl is ShotUnitCtrl)
+        {
+            var opponentShotUnitCtrl = opponentUnitCtrl as ShotUnitCtrl;
+            opponentShotUnitCtrl.TryCollisionDead();
         }
-
-        if (shotUnitCtrl.unitProp.isThrough == true || shotUnitCtrl.isThrough == true)
-            return; //穿透子彈不回收
-
-        triggerDead();
+        else
+        {
+            opponentUnitCtrl.unitProp.isTriggerDead = true;
+        }
     }
 
-    protected virtual void Attacked(UnitCtrlBase AttackerUnitCtrl)
+
+
+    protected virtual void Attacked(UnitCtrlBase opponentUnitCtrl)
     {
-        
+
     }
 }

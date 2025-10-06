@@ -2,24 +2,25 @@ using UnityEngine;
 using UnityEngine.UI;
 using System;
 using System.Linq;
-using static CommonData;
-using static CommonFunc;
-using static PlayerKeyCtrl;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
+using static PlayerKeyHelper;
 using static PlayerSaveData;
 using static GameConfig;
 using System.Collections.Generic;
 public class DifficultSelect : SelectBase<DifficultSelect,DifficultOption>
 {
-    protected override void ClickExtraHandle()
+    protected override void ClickHandle()
     {
         
-        if (Input.GetKeyDown(GetSetKey(KeyCode.Z)))
+        if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.Z)))
         {
             Hide();
-            GameSystem.Instance.selectDifficult = nowBtn.difficult;
+            GameSelect.difficult = nowBtn.difficult;
             Next();
         }
-        else if (Input.GetKeyDown(GetSetKey(KeyCode.X)))
+        else if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.X)))
         {
             Hide();
             Back();

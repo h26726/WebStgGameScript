@@ -1,8 +1,9 @@
 using UnityEngine;
-using static CommonData;
-using static CommonFunc;
+using static EnumData;
+using static CreateSettingData;
+using static CommonHelper;
 using static GameConfig;
-using static PlayerKeyCtrl;
+using static PlayerKeyHelper;
 using static PlayerSaveData;
 using System;
 using System.Linq;
@@ -10,7 +11,7 @@ using System.Collections.Generic;
 
 public interface ISelectBaseUpdater
 {
-    void UpdateHandle();
+    void UpdateHandler();
 }
 public abstract class SelectBase<T, TBtn> : SingletonBase<T>, ISelectBaseUpdater
     where T : SelectBase<T, TBtn>
@@ -23,6 +24,7 @@ public abstract class SelectBase<T, TBtn> : SingletonBase<T>, ISelectBaseUpdater
     public event Action nextAction;
     public event Action backAction;
     protected int nowBtnKey = 0;
+    protected int time = 0;
     public TBtn nowBtn
     {
         get
@@ -32,7 +34,12 @@ public abstract class SelectBase<T, TBtn> : SingletonBase<T>, ISelectBaseUpdater
     }
     void Awake()
     {
-        UpdateManager.Instance.selectList.Add(Instance);
+        Init();
+    }
+
+    protected virtual void Init()
+    {
+        LoadCtrl.Instance.selectList.Add(Instance);
         selfAnimator = GetComponent<Animator>();
         canvasGroup = GetComponent<CanvasGroup>();
         var hides = btns.Where(r => r.isHide).ToList();
@@ -41,47 +48,50 @@ public abstract class SelectBase<T, TBtn> : SingletonBase<T>, ISelectBaseUpdater
             hide.animator.gameObject.SetActive(false);
         }
         btns[nowBtnKey].animator.Play("Active");
-        AwakeHandle();
     }
 
-    protected virtual void AwakeHandle()
-    {
 
-    }
-
-   
     public void Show()
     {
+        gameObject.SetActive(true);
         if (isSwitchCamara)
         {
-            LoadingCtrl.Instance.titleCamera.enabled = true;
-            LoadingCtrl.Instance.gameCamera.enabled = false;
+            LoadCtrl.Instance.SwitchTitleCamera();
         }
-
         selfAnimator.Play("Show");
+        AutoSelectNextAbleUseBtn(ref nowBtnKey, 0, btns);
+
     }
 
     public void Hide()
     {
         if (isSwitchCamara)
         {
-            LoadingCtrl.Instance.titleCamera.enabled = false;
-            LoadingCtrl.Instance.gameCamera.enabled = true;
+            LoadCtrl.Instance.SwitchGameCamera();
         }
         selfAnimator.Play("Hide");
+        time = 0;
     }
 
 
-    public void UpdateHandle()
+    public virtual void UpdateHandler()
     {
-        if (CheckBlockAndSpecialHandle())
+        if (gameObject.activeSelf == false)
+            return;
+        if (canvasGroup.alpha == 0)
         {
+            time++;
+            if (time >= GameConfig.SELECT_AUTO_CLOSE_TIME)
+            {
+                gameObject.SetActive(false);
+                time = 0;
+            }
             return;
         }
         if (canvasGroup.alpha < 0.8)
             return;
+        PressUpDownHandle();
         ClickHandle();
-        ClickExtraHandle();
     }
 
     public void Next()
@@ -95,37 +105,65 @@ public abstract class SelectBase<T, TBtn> : SingletonBase<T>, ISelectBaseUpdater
             backAction.Invoke();
     }
 
-    public void AddNext(Action action)
+    public void SetNextAction(Action action)
     {
         nextAction = null;
         nextAction += action;
     }
-    public void AddBack(Action action)
+    public void SetBackAction(Action action)
     {
         backAction = null;
         backAction += action;
     }
 
 
-    protected void ClickUpDownHandle(List<KeyBoardSaveData> keyBoardSaveData = null)
+    protected void PressUpDownHandle()
     {
-        var upDown = KeyBoardOnceToDirectVal(keyBoardSaveData);
+        var upDown = GetKeyOneVal_UpDown(null);
         if (upDown != 0)
         {
-            AutoSkipNotBtnAndOutBtn(ref nowBtnKey, upDown, btns);
+            AutoSelectNextAbleUseBtn(ref nowBtnKey, upDown, btns);
         }
     }
 
-    protected abstract void ClickExtraHandle();
+    protected abstract void ClickHandle();
 
-
-    protected virtual void ClickHandle()
+    void AutoSelectNextAbleUseBtn(ref int _BtnKey, int upDown, OptionBase[] _Btns)
     {
-        ClickUpDownHandle(null);
+        if (upDown != 0)
+            _Btns[_BtnKey].animator.Play("Idle");
+        _BtnKey += upDown;
+        uint Count = 0;
+        while (true)
+        {
+            if (_Btns.Length <= _BtnKey)
+            {
+                _BtnKey = 0;
+            }
+            else if (_BtnKey < 0)
+            {
+                _BtnKey = _Btns.Length - 1;
+            }
+
+
+            if (!_Btns[_BtnKey].isHide && !_Btns[_BtnKey].isDisable)
+            {
+                break;
+            }
+            _BtnKey = _BtnKey + upDown;
+
+            Count++;
+            if (Count > 100)
+            {
+                Debug.LogError("Count > 100");
+                break;
+            }
+        }
+        _Btns[_BtnKey].animator.Play("Active");
     }
 
-    protected virtual bool CheckBlockAndSpecialHandle()
-    {
-        return false;
-    }
+
+
+
+
 }
