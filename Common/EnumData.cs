@@ -13,6 +13,13 @@ using static GameReplay;
 
 public static class EnumData
 {
+    public enum BoolState
+    {
+        Invalid = -1,
+        False = 0,
+        True = 1
+    }
+
     public enum VersionGetType
     {
         InsideCreateByXml,

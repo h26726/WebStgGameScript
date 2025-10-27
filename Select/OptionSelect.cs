@@ -6,7 +6,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using System.Collections.Generic;
 public class OptionSelect : SelectBase<OptionSelect, TextOption>
@@ -18,7 +18,7 @@ public class OptionSelect : SelectBase<OptionSelect, TextOption>
     uint longDownTime = 0;
     protected override void ClickHandle()
     {
-        
+
         if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.Z)))
         {
             if (nowBtn.name == TextName.儲存並返回)
@@ -33,6 +33,7 @@ public class OptionSelect : SelectBase<OptionSelect, TextOption>
             else if (nowBtn.name == TextName.取消)
             {
                 Hide();
+                UseConfigSaveDatas();
                 TitleSelect.Instance.Show();
                 LoadCtrl.Instance.ChangeVolumeByConfigSave();
             }
@@ -40,6 +41,7 @@ public class OptionSelect : SelectBase<OptionSelect, TextOption>
         else if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.X)))
         {
             Hide();
+            UseConfigSaveDatas();
             TitleSelect.Instance.Show();
             LoadCtrl.Instance.ChangeVolumeByConfigSave();
 

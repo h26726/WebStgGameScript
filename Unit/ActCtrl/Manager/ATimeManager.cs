@@ -4,7 +4,7 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using UnityEngine.UI;
@@ -14,10 +14,10 @@ public class ATimeManager
 {
     public SettingBase setting;
     public UnitCtrlObj unitCtrlObj;
-    public bool isRun = false;
-    public bool isMoveStop = false;
-    public bool isBoss = false;
-    public uint aTime = 0;
+    public bool isRun;
+    public bool isMoveStop;
+    public bool isBoss;
+    public uint aTime;
     public uint coreSettingId;
 
 
@@ -25,7 +25,7 @@ public class ATimeManager
     {
         get
         {
-            return setting.actTime == null;
+            return InvalidHelper.IsInvalid(setting.actTime);
         }
     }
 
@@ -44,7 +44,11 @@ public class ATimeManager
             return aTime == setting.actTime + 1;
         }
     }
-    public ATimeManager(ActCtrl actCtrl, bool isBoss)
+    public ATimeManager()
+    {
+        Reset();
+    }
+    public void Set(ActCtrl actCtrl, bool isBoss)
     {
         this.isRun = true;
         this.isMoveStop = false;
@@ -52,6 +56,19 @@ public class ATimeManager
         this.unitCtrlObj = actCtrl.unitCtrlObj;
         this.setting = actCtrl.setting;
         this.coreSettingId = actCtrl.coreSettingId;
+        this.aTime = 0;
+    }
+
+    public void Reset()
+    {
+        this.isRun = false;
+        this.isMoveStop = false;
+        this.isBoss = false;
+        this.unitCtrlObj = null;
+        this.setting = null;
+        this.coreSettingId = 0;
+        this.aTime = 0;
+
     }
     public void UpdateAddCount()
     {
@@ -60,7 +77,7 @@ public class ATimeManager
 
         aTime++;
 
-        unitCtrlObj.AddPrintContent($"aTime:{aTime}   {Environment.NewLine}");
+        // unitCtrlObj.AddPrintContent($"aTime:{aTime}   {Environment.NewLine}");
         if (isNotSetActTime || isMoveStop)
             return;
         if (isArriveSetActTime)
@@ -85,12 +102,12 @@ public class ATimeManager
     {
         if (setting.type == TypeValue.BOSS || setting.type == TypeValue.復位)
         {
-            GameMainCtrl.Instance.gameSceneUpdateFlag |= UpdateFlag.WaitSpellEnd;
+            GameMainCtrl.Instance.gameSceneUpdateFlag |= UpdateFlag.LateSpellEnd;
         }
         else if (setting.type == TypeValue.BOSSLEAVE)
         {
             GameBoss.nowUnit.enemyProp.isTriggerRestore = true;
-            GamePlayer.nowUnit.unitProp.isInvincible = false;
+            // GamePlayer.nowUnit.unitProp.isInvincible = false;
         }
     }
 

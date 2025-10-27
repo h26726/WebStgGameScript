@@ -4,7 +4,7 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using UnityEngine.UI;
@@ -51,6 +51,6 @@ public class ReplayOption : OptionBase
     public Text[] line { get; set; }
     public uint no { get; set; }
     public InputField inputField { get; set; }
-    public PlayerSaveData.ReplaySaveData replayData { get; set; }
+    public SaveJsonData.ReplaySaveData replayData { get; set; }
 }
 

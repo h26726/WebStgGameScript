@@ -6,7 +6,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using System.Collections.Generic;
 using UnityEngine.EventSystems;
@@ -52,7 +52,7 @@ public class ReplaySelect : SelectBase<ReplaySelect, ReplayOption>
     bool isInputText = false;
 
 
-    protected override void Init()
+    public override void Init()
     {
         base.Init();
         foreach (var btn in btns)
@@ -97,7 +97,8 @@ public class ReplaySelect : SelectBase<ReplaySelect, ReplayOption>
                 GameReplay.InputSaveData.No = nowBtn.no;
                 GameReplay.InputSaveData.time = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss");
                 GameReplay.InputSaveData.name = nowBtn.inputField.text;
-                PlayerSaveData.SaveReplayData();
+                SaveJsonData.ChangeOneReplayData();
+                SaveJsonData.SaveReplayData();
             }
             UseReplaySaveDatas();
         }
@@ -130,11 +131,13 @@ public class ReplaySelect : SelectBase<ReplaySelect, ReplayOption>
             if (IsRead)
             {
                 Hide();
-                var ReplayData = PlayerSaveData.replaySaveDatas.FirstOrDefault(r => r.No == nowBtn.no);
+                var ReplayData = SaveJsonData.replaySaveDatas.FirstOrDefault(r => r.No == nowBtn.no);
                 GameSelect.difficult = ReplayData.selectDifficult;
                 GameSelect.practiceId = ReplayData.selectPracticeId;
-                GameReplay.playKeys = ReplayData.replayKeys;
-                GameReplay.playMaxKeyPressTime = (uint)ReplayData.replayKeys.Max(r => r.keyPressTime);
+                GameReplay.isReplayMode = true;
+                GameReplay.SetPlayReplayData(ReplayData.replayKeys);
+                // GameReplay.playKeys = ReplayData.replayKeys;
+                // GameReplay.playMaxKeyPressTime = (uint)ReplayData.replayKeys.Max(r => r.keyPressTime);
                 LoadCtrl.Instance.gameState = GameSceneState.Stop;
                 LoadCtrl.Instance.SwitchPage(PageIndex.Game);
             }
@@ -173,7 +176,7 @@ public class ReplaySelect : SelectBase<ReplaySelect, ReplayOption>
 
     public void UseReplaySaveDatas()
     {
-        var replayDatas = PlayerSaveData.replaySaveDatas.Where(r => r.No > (nowPage - 1) * 10 && r.No <= nowPage * 10).ToList();
+        var replayDatas = SaveJsonData.replaySaveDatas.Where(r => r.No > (nowPage - 1) * 10 && r.No <= nowPage * 10).ToList();
 
         for (int i = 0; i < 10; i++)
         {

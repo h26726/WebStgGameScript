@@ -10,20 +10,9 @@ using static PlayerKeyHelper;
 
 public static class CreateSettingData
 {
+
+
     [Serializable]
-    public class ConfigParam
-    {
-        public string key = null;
-        public string PreLayerNo = null;
-        public Vector2? pos = null;
-        public float? floatVal = null;
-        public int? intVal = null;
-        public string text = null;
-    }
-
-
-
-
     public class CreateStageSetting
     {
         public uint Id
@@ -77,17 +66,17 @@ public static class CreateSettingData
     }
 
     [Serializable]
-    public class Pos
+    public class Pos : IPrintable
     {
-        public Vector2? point = null;
-        public uint? Id = null;
+        public Vector2 point = GameConfig.VECTOR2_INVAILD;
+        public uint Id = GameConfig.UINT_INVAILD;
         public List<AngleSet> ADangle = null;
-        public float? ADdistance = null;
+        public float ADdistance = GameConfig.FLOAT_INVAILD;
         public string Print()
         {
             string str = "";
 
-            if (Id != null)
+            if (!InvalidHelper.IsInvalid(Id))
                 str += $"   [p] Id= {Id}{Environment.NewLine}";
 
             if (point != null)
@@ -101,7 +90,7 @@ public static class CreateSettingData
                 }
             }
 
-            if (ADdistance != null)
+            if (!InvalidHelper.IsInvalid(ADdistance))
                 str += $"   [p] ADdistance= {ADdistance}{Environment.NewLine}";
 
             return str;
@@ -110,12 +99,12 @@ public static class CreateSettingData
 
 
     [Serializable]
-    public class AngleSet
+    public class AngleSet : IPrintable
     {
-        public float? angle = null;
+        public float angle = GameConfig.FLOAT_INVAILD;
         public uint[] Ids = null;
-        public uint? recordId = null;
-        public uint? IdRotateZ = null;
+        public uint recordId = GameConfig.UINT_INVAILD;
+        public uint IdRotateZ = GameConfig.UINT_INVAILD;
         public uint[] IdMoveAngle = null;
         public Pos pos1 = null;
         public Pos pos2 = null;
@@ -133,7 +122,7 @@ public static class CreateSettingData
                     str += $"   [a] Ids = error{Environment.NewLine}";
             }
 
-            if (angle != null)
+            if (!InvalidHelper.IsInvalid(angle))
                 str += $"   [a] angle= {angle}{Environment.NewLine}";
 
             if (pos1 != null)
@@ -149,12 +138,12 @@ public static class CreateSettingData
     [Serializable]
     public class DialogSetting
     {
-        public uint? Id = null;
-        public uint? mainId = null;
-        public string text = null;
-        public string leftAni = null;
-        public string rightAni = null;
-        public string bgm = null;
+        public uint Id = GameConfig.UINT_INVAILD;
+        public uint mainId = GameConfig.UINT_INVAILD;
+        public string text = GameConfig.STRING_INVAILD;
+        public string leftAni = GameConfig.STRING_INVAILD;
+        public string rightAni = GameConfig.STRING_INVAILD;
+        public string bgm = GameConfig.STRING_INVAILD;
     }
 
     [Serializable]

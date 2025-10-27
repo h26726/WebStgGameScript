@@ -6,7 +6,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 
 using UnityEngine.UI;
@@ -18,10 +18,11 @@ public class DialogCtrl : MonoBehaviour
     [SerializeField] Animator rightPaintAnimator;
 
 
-    List<DialogSetting> selectDialogSettings = new List<DialogSetting>();
+    uint waitEventTargetTime;
     uint nowDialogSettingsKey;
-    public static DialogCtrl nowInstance = null;
-    public UpdateFlag dialogCtrlUpdateFlag = UpdateFlag.None;
+    public static DialogCtrl nowInstance;
+    public UpdateFlag dialogCtrlUpdateFlag { get; set; }
+    List<DialogSetting> selectDialogSettings;
     public enum UpdateFlag
     {
         None,
@@ -42,7 +43,30 @@ public class DialogCtrl : MonoBehaviour
         }
     }
 
-    uint waitEventTargetTime;
+
+    void Awake()
+    {
+        selectDialogSettings = new List<DialogSetting>();
+        Reset();
+    }
+
+    public void Reset()
+    {
+        waitEventTargetTime = 0;
+        nowDialogSettingsKey = 0;
+        dialogCtrlUpdateFlag = UpdateFlag.None;
+        selectDialogSettings.Clear();
+    }
+
+    public void Close()
+    {
+        leftPaintAnimator.Rebind();
+        rightPaintAnimator.Rebind();
+        leftPaintAnimator.Update(0f);
+        rightPaintAnimator.Update(0f);
+        gameObject.SetActive(false);
+        nowInstance = null;
+    }
 
     public void UpdateHandler()
     {
@@ -84,50 +108,54 @@ public class DialogCtrl : MonoBehaviour
 
     public void DialogCtrlStart(uint mainId)
     {
-        if (nowInstance != null)
-        {
-            Debug.LogError("DialogCtrlStart called while another DialogCtrl instance is active.");
-        }
-        nowInstance = this;
-        selectDialogSettings = GetDialogSettings(mainId);
+
         if (IS_OPEN_DIALOG)
         {
+            if (nowInstance != null)
+            {
+                Debug.LogError("DialogCtrlStart called while another DialogCtrl instance is active.");
+            }
             gameObject.SetActive(true);
+            nowInstance = this;
+            selectDialogSettings = GetDialogSettings(mainId);
             GameMainCtrl.Instance.nowGameProgressState = GameProgressState.Dialog;
             waitEventTargetTime = GameReplay.keyPressTime + DIALOG_DELAY_KEY_TIME;
             nowDialogSettingsKey = 0;
             GameObjCtrl.Instance.ShowDialogBox();
+            ShowDialog();
             dialogCtrlUpdateFlag = UpdateFlag.WaitDialogBoxShow;
         }
     }
 
 
 
-    void HideDialogBox()
+    public void HideDialogBox()
     {
+        GameObjCtrl.Instance.DialogChangeText("");
+        GameObjCtrl.Instance.DialogCloseText();
         GameObjCtrl.Instance.HideDialogBoxStep1();
         if (!leftPaintAnimator.GetCurrentAnimatorStateInfo(0).IsName("Hide")) leftPaintAnimator.Play("Hide");
         if (!rightPaintAnimator.GetCurrentAnimatorStateInfo(0).IsName("Hide")) rightPaintAnimator.Play("Hide");
         waitEventTargetTime = GameReplay.keyPressTime + DIALOG_DELAY_KEY_TIME;
+        Debug.Log("waitEventTargetTime:" + waitEventTargetTime);
         dialogCtrlUpdateFlag = UpdateFlag.WaitDialogBoxHide;
     }
 
     public void DialogCtrlStop()
     {
-        nowInstance = null;
-        dialogCtrlUpdateFlag = UpdateFlag.None;
+        Reset();
+        Close();
         GameObjCtrl.Instance.HideDialogBoxStep2();
-        gameObject.SetActive(false);
         GameMainCtrl.Instance.nowGameProgressState = GameProgressState.Stage;
     }
-
 
 
     void WaitDialogBoxShowUpdate()
     {
         if (waitEventTargetTime != GameReplay.keyPressTime)
             return;
-            
+
+        GameObjCtrl.Instance.DialogOpenText();
         if (GameReplay.isReplayMode)
         {
             dialogCtrlUpdateFlag = UpdateFlag.WaitDialogReplay;
@@ -148,17 +176,11 @@ public class DialogCtrl : MonoBehaviour
 
     void WaitDialogReplayUpdate()
     {
-        if (!GameReplay.playKeys.Any(r => r.keyPressTime == GameReplay.keyPressTime))
+        if (!GameReplay.CheckPlayKeyExist())
             return;
 
-        if (GameReplay.playKeys.Where(r => r.keyPressTime == GameReplay.keyPressTime).Count() > 1)
-        {
-            Debug.LogError($"keyPressTime: {GameReplay.keyPressTime} Repeat");
-            return;
-        }
-
-        var playKeyCodes = GameReplay.playKeys.FirstOrDefault(r => r.keyPressTime == GameReplay.keyPressTime).pressKeyCodes;
-        if (playKeyCodes.Contains(KeyCode.Z))
+        var playKeyCodes = GameReplay.GetNowPlayKeyCodes();
+        if (playKeyCodes.Contains(KeyCode.D))
         {
             EnterNextDialog();
         }
@@ -168,45 +190,32 @@ public class DialogCtrl : MonoBehaviour
     {
         if (Input.GetKeyDown(TransferToPlayerSetKey(KeyCode.Z)) || Input.GetKeyDown(KeyCode.Joystick1Button1))
         {
-            AddNowClickIntoReplaySaveData();
+            GameReplay.InputSaveData.AddReplayKey(GameReplay.keyPressTime, KeyCode.D);
             EnterNextDialog();
-        }
-    }
-
-    void AddNowClickIntoReplaySaveData()
-    {
-        if (!GameReplay.InputSaveData.replayKeys.Any(r => r.keyPressTime == GameReplay.keyPressTime))
-        {
-            var ReplayKey = new ReplayKey();
-            ReplayKey.keyPressTime = GameReplay.keyPressTime;
-            ReplayKey.pressKeyCodes.Add(KeyCode.Z);
-            GameReplay.InputSaveData.replayKeys.Add(ReplayKey);
-        }
-        else
-        {
-            //同時有上下左右移動之類的按鍵紀錄 則多塞Z的按鍵至原本的
-            var oldReplayKey = GameReplay.InputSaveData.replayKeys.FirstOrDefault(r => r.keyPressTime == GameReplay.keyPressTime);
-            oldReplayKey.pressKeyCodes.Add(KeyCode.Z);
         }
     }
 
     void EnterNextDialog()
     {
         nowDialogSettingsKey++;
+        ShowDialog();
+    }
+
+    void ShowDialog()
+    {
         if (nowDialogSettingsKey < selectDialogSettings.Count)
         {
             leftPaintAnimator.Play(nowDialogSetting.leftAni);
             rightPaintAnimator.Play(nowDialogSetting.rightAni);
-            if (nowDialogSetting.bgm != null)
+            if (!InvalidHelper.IsInvalid(nowDialogSetting.bgm))
             {
                 LoadCtrl.Instance.pool.PlayBgm(nowDialogSetting.bgm);
             }
-            GameObjCtrl.Instance.DialogBoxChangeText(nowDialogSetting.text);
+            GameObjCtrl.Instance.DialogChangeText(nowDialogSetting.text);
         }
         else
         {
             HideDialogBox();
         }
-
     }
 }

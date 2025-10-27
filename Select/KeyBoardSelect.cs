@@ -6,7 +6,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using System.Collections.Generic;
 
@@ -31,11 +31,12 @@ public class KeyBoardSelect : SelectBase<KeyBoardSelect, KeyOption>
                 }
                 if (TransferToTmpSetKey(KeyCode.UpArrow, tmpKeyBoardSaveData) != keycode && TransferToTmpSetKey(KeyCode.DownArrow, tmpKeyBoardSaveData) != keycode
                 && TransferToTmpSetKey(KeyCode.LeftArrow, tmpKeyBoardSaveData) != keycode && TransferToTmpSetKey(KeyCode.RightArrow, tmpKeyBoardSaveData) != keycode
-                && TransferToTmpSetKey(KeyCode.X, tmpKeyBoardSaveData) != keycode && TransferToTmpSetKey(KeyCode.Escape, tmpKeyBoardSaveData) != keycode)
+                && TransferToTmpSetKey(KeyCode.X, tmpKeyBoardSaveData) != keycode
+                 && TransferToTmpSetKey(KeyCode.Escape, tmpKeyBoardSaveData) != keycode)
                 {
                     if (nowBtn.name == TextName.儲存並返回)
                     {
-                        PlayerSaveData.keyBoardSaveDatas = tmpKeyBoardSaveData;
+                        SaveJsonData.keyBoardSaveDatas = tmpKeyBoardSaveData;
                         SaveKeyBoardData();
                         Hide();
                         TitleSelect.Instance.Show();
@@ -66,18 +67,24 @@ public class KeyBoardSelect : SelectBase<KeyBoardSelect, KeyOption>
 
     public void UseKeyBoardSaveDatas()
     {
-        tmpKeyBoardSaveData = new List<KeyBoardSaveData>();
+        // 深拷貝 SaveJsonData.keyBoardSaveDatas 到 tmpKeyBoardSaveData
+        tmpKeyBoardSaveData = SaveJsonData.keyBoardSaveDatas
+            .Select(data => new KeyBoardSaveData()
+            {
+                baseKey = data.baseKey,
+                setKey = data.setKey
+            })
+            .ToList();
+
+        // 更新按鈕文字
         foreach (var btn in btns)
         {
             if (btn.keyCode == KeyCode.None)
                 continue;
-            var setKey = PlayerSaveData.keyBoardSaveDatas.FirstOrDefault(r => r.baseKey == btn.keyCode).setKey;
-            btn.text.text = setKey.ToString();
-            tmpKeyBoardSaveData.Add(new KeyBoardSaveData()
-            {
-                baseKey = btn.keyCode,
-                setKey = setKey,
-            });
+
+            var match = tmpKeyBoardSaveData.FirstOrDefault(r => r.baseKey == btn.keyCode);
+            if (match != null)
+                btn.text.text = match.setKey.ToString();
         }
     }
 }

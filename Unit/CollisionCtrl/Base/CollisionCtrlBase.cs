@@ -11,12 +11,14 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 
 public abstract class CollisionCtrlBase : MonoBehaviour
 {
-    public UnitCtrlBase unitCtrl { get; set; }
+    // public UnitCtrlBase unitCtrl { get; set; }
+    public UnitCtrlObj unitCtrlObj { get; set; }
+    public UnitPropBase unitProp { get; set; }
 
 
     void Awake()
@@ -24,32 +26,49 @@ public abstract class CollisionCtrlBase : MonoBehaviour
     }
     public void Init(UnitCtrlBase unitCtrl)
     {
-        this.unitCtrl = unitCtrl;
+        this.unitCtrlObj = unitCtrl.unitCtrlObj;
+        this.unitProp = unitCtrl.unitProp;
     }
 
     protected void CollisionHandle(Collider2D opponentCollision)
     {
-        if (unitCtrl.unitProp.isDead || !unitCtrl.unitProp.isAllowCollision)
+        if (unitProp.isDead || !unitProp.isAllowCollision)
             return;
-        var opponentUnitCtrl = opponentCollision.GetComponent<CollisionCtrlBase>().unitCtrl;
-        if (opponentUnitCtrl.unitProp.isDead || !opponentUnitCtrl.unitProp.isAllowCollision)
-            return;
-        Attacked(opponentUnitCtrl);
+        var opponentCollisionCtrl = opponentCollision.GetComponent<CollisionCtrlBase>();
+        var opponentUnitProp = opponentCollisionCtrl.unitProp;
+        var opponentUnitCtrlObj = opponentCollisionCtrl.unitCtrlObj;
 
-        if (opponentUnitCtrl is ShotUnitCtrl)
+        if (opponentUnitProp.isDead || !opponentUnitProp.isAllowCollision)
+            return;
+        Attacked(opponentUnitProp);
+
+        if (opponentUnitProp is ShotUnitProp && opponentUnitCtrlObj is ShotCtrlObj)
         {
-            var opponentShotUnitCtrl = opponentUnitCtrl as ShotUnitCtrl;
-            opponentShotUnitCtrl.TryCollisionDead();
+            var opponentShotUnitProp = opponentUnitProp as ShotUnitProp;
+            var opponentShotUnitCtrlObj = opponentUnitCtrlObj as ShotCtrlObj;
+            TryCollisionDead(opponentShotUnitProp, opponentShotUnitCtrlObj);
         }
         else
         {
-            opponentUnitCtrl.unitProp.isTriggerDead = true;
+            opponentUnitProp.isTriggerDead = true;
         }
+    }
+
+    void TryCollisionDead(ShotUnitProp opponentShotUnitProp, ShotCtrlObj opponentShotUnitCtrlObj)
+    {
+        if (opponentShotUnitProp.isThrough || opponentShotUnitCtrlObj.isThrough)
+            return;
+        opponentShotUnitProp.isTriggerDead = true;
     }
 
 
 
-    protected virtual void Attacked(UnitCtrlBase opponentUnitCtrl)
+    protected virtual void Attacked(UnitPropBase opponentUnitProp)
+    {
+
+    }
+
+    public virtual void UpdateHandler()
     {
 
     }

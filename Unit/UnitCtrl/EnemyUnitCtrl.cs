@@ -11,7 +11,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 
 public class EnemyUnitCtrl : UnitCtrlBase
@@ -26,6 +26,7 @@ public class EnemyUnitCtrl : UnitCtrlBase
         set => unitProp = value;
     }
 
+
     public override void Unit3_TriggerDead_OnWaitAni()
     {
         base.Unit3_TriggerDead_OnWaitAni();
@@ -36,7 +37,7 @@ public class EnemyUnitCtrl : UnitCtrlBase
         for (int i = 0; i < PowerGiveNum; i++)
         {
             var unitCtrl = GameSelect.powerData.powerCreateStageSettings[i];
-            unitProp.propWaitDebutByCreateSettings.Add((unitCtrl));
+            unitProp.propLateDebutByCreateSettings.Add((unitCtrl));
         }
     }
 
@@ -47,10 +48,10 @@ public class EnemyUnitCtrl : UnitCtrlBase
 
         if (createStageSetting == null)
             return;
-        if (coreSetting.powerGive == null || coreSetting.powerGive == 0)
+        if (InvalidHelper.IsInvalid(coreSetting.powerGive) || coreSetting.powerGive == 0)
             return;
 
         var PowerGiveNum = coreSetting.powerGive;
-        GivePower(PowerGiveNum.Value);
+        GivePower(PowerGiveNum);
     }
 }

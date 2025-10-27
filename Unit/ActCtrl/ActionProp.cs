@@ -4,28 +4,42 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using UnityEngine.UI;
 public class ActionProp
 {
-    protected SettingBase setting = null;
-    UnitCtrlObj unitCtrlObj = null;
-    public float moveAngle = 0;
-    public float speed = 0;
+    protected SettingBase setting;
+    UnitCtrlObj unitCtrlObj;
+    public float moveAngle;
+    public float speed;
 
-    public uint? timPosTime = null;
-    public Vector2? timPosPos = null;
-    public float? timPosMoveDis = null;
-    public float? timPosSpeedPoint = null;
-    public float? timPosStartSpeed = null;
-    public float? timPosEndSpeed = null;
-    public float? timPosAddSpeed = null;
-    public float? timPosSpeed = null;
+    public uint timPosTime;
+    public Vector2 timPosPos;
+    public float timPosMoveDis;
+    public float timPosSpeedPoint;
+    public float timPosStartSpeed;
+    public float timPosEndSpeed;
+    public float timPosAddSpeed;
+    public float timPosSpeed;
 
-
-    public ActionProp(UnitCtrlObj unitCtrlObj, SettingBase setting, float moveAngleVal, float speed)
+    public void Reset()
+    {
+        setting = null;
+        unitCtrlObj = null;
+        moveAngle = 0;
+        speed = 0;
+        timPosTime = GameConfig.UINT_INVAILD;
+        timPosPos = GameConfig.VECTOR2_INVAILD;
+        timPosMoveDis = GameConfig.FLOAT_INVAILD;
+        timPosSpeedPoint = GameConfig.FLOAT_INVAILD;
+        timPosStartSpeed = GameConfig.FLOAT_INVAILD;
+        timPosEndSpeed = GameConfig.FLOAT_INVAILD;
+        timPosAddSpeed = GameConfig.FLOAT_INVAILD;
+        timPosSpeed = GameConfig.FLOAT_INVAILD;
+    }
+    public void Set(UnitCtrlObj unitCtrlObj, SettingBase setting, float moveAngleVal, float speed)
     {
         this.setting = setting;
         this.moveAngle = moveAngleVal;
@@ -34,16 +48,16 @@ public class ActionProp
         SetTimPos();
         SetSpeed();
         SetMoveAngle();
-        unitCtrlObj.AddPrintContent(PrintActionProp());
+        // unitCtrlObj.AddPrintContent(PrintActionProp());
     }
 
 
 
     public void SetTimPos()
     {
-        if (setting.timPosTime != null)
+        if (!InvalidHelper.IsInvalid(setting.timPosTime))
         {
-            timPosTime = setting.timPosTime.Value;
+            timPosTime = setting.timPosTime;
             Vector2 pos = unitCtrlObj.GetPos(setting.timPosPos);
             timPosPos = pos;
             moveAngle = CalAngle(unitCtrlObj.transform.position, pos);
@@ -51,23 +65,23 @@ public class ActionProp
             timPosMoveDis = Vector2.Distance(unitCtrlObj.transform.position, pos);
 
             timPosSpeedPoint = 0;
-            if (setting.timPosSpeedPoint != null)
-                timPosSpeedPoint = setting.timPosSpeedPoint.Value;
+            if (!InvalidHelper.IsInvalid(setting.timPosSpeedPoint))
+                timPosSpeedPoint = setting.timPosSpeedPoint;
 
             timPosStartSpeed = 0;
-            if (setting.timPosStartSpeed != null)
-                timPosStartSpeed = setting.timPosStartSpeed.Value;
+            if (!InvalidHelper.IsInvalid(setting.timPosStartSpeed))
+                timPosStartSpeed = setting.timPosStartSpeed;
 
             timPosEndSpeed = 0;
-            if (setting.timPosEndSpeed != null)
-                timPosEndSpeed = setting.timPosEndSpeed.Value;
+            if (!InvalidHelper.IsInvalid(setting.timPosEndSpeed))
+                timPosEndSpeed = setting.timPosEndSpeed;
 
             var speedSum = timPosStartSpeed / 60 * timPosTime * timPosSpeedPoint + timPosEndSpeed / 60 * timPosTime * (1 - timPosSpeedPoint);
             var disSpeed = speedSum - timPosMoveDis;
             var front = (setting.timPosTime * timPosSpeedPoint) - 1f;
             var after = (setting.timPosTime * (1 - timPosSpeedPoint)) - 1f;
-            var uFront = (uint)Mathf.Max(0f, front.Value);
-            var uAfter = (uint)Mathf.Max(0f, after.Value);
+            var uFront = (uint)Mathf.Max(0f, front);
+            var uAfter = (uint)Mathf.Max(0f, after);
             var LoopSum = CalcArithSum(uFront) + CalcArithSum(uAfter);
             timPosAddSpeed = disSpeed / LoopSum;
             if (timPosSpeedPoint == 0) timPosStartSpeed = timPosEndSpeed - timPosAddSpeed * timPosTime;
@@ -78,9 +92,9 @@ public class ActionProp
     }
     public void SetSpeed()
     {
-        if (setting.speed != null)
+        if (!InvalidHelper.IsInvalid(setting.speed))
         {
-            speed = setting.speed.Value;
+            speed = setting.speed;
         }
     }
 
@@ -97,7 +111,7 @@ public class ActionProp
         string print = $"[AP]ActionProp {Environment.NewLine}";
         print += $"--[AP]MoveAngle:{moveAngle} {Environment.NewLine}";
         print += $"--[AP]Speed:{speed} {Environment.NewLine}";
-        if (timPosTime != null)
+        if (!InvalidHelper.IsInvalid(timPosTime))
         {
             print += $"--[AP]TimPosTime:{timPosTime} {Environment.NewLine}";
             print += $"--[AP]TimPosPos:{timPosPos} {Environment.NewLine}";

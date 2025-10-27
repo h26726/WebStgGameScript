@@ -4,7 +4,7 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using UnityEngine.UI;

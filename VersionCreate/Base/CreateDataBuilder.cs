@@ -8,7 +8,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static XmlStageSettingBuilder;
 
 using System.Linq;
@@ -70,13 +70,41 @@ public static class CreateDataBuilder
 
         }
 
+        void CallRuleSchemeCallTargetSet(XmlStageSetting xmlStageSetting)
+        {
+            if (createStageSetting.coreSetting.Id == stageSetting.Id)
+            {
+                callRuleScheme.callTargetFlag = CallRuleScheme.CallTargetFlag.Create;
+                callRuleScheme.createStageSetting = createStageSetting;
+                // if (createStageSetting.Id == 17101)
+                //     Debug.LogError($"table:{xmlStageSetting.table} , xmlID:{xmlStageSetting.Order}, xmlStageSetting.Type:{xmlStageSetting.Type}");
+            }
+            else
+            {
+                callRuleScheme.callTargetFlag = CallRuleScheme.CallTargetFlag.ActRun;
+                callRuleScheme.coreId = createStageSetting.coreSetting.Id;
+                callRuleScheme.actId = stageSetting.Id;
+                // if (callRuleScheme.actId == 136011)
+                //     Debug.LogError($"table:{xmlStageSetting.table} , xmlID:{xmlStageSetting.Order}, xmlStageSetting.Type:{xmlStageSetting.Type}");
+            }
+        }
+
         bool checkAnglePos1Reference = false;
         bool checkAnglePos2Reference = false;
         bool checkPosReference = false;
         bool checkAngleReference = false;
+        bool checkCallById = false;
         while (k < xmlStageSettings.Count)
         {
             var xmlStageSetting = xmlStageSettings[(int)k];
+            if (checkCallById)
+            {
+                checkCallById = false;
+                if (xmlStageSetting.Type != TypeValue.啟動依開始時間後 && xmlStageSetting.Type != TypeValue.啟動依結束時間前)
+                {
+                    // Debug.LogError($"table:{xmlStageSetting.table} , xmlID:{xmlStageSetting.Order}, xmlStageSetting.Type:{xmlStageSetting.Type}  checkCallById Fail");
+                }
+            }
 
             Debug.Log($"table:{xmlStageSetting.table} , xmlID:{xmlStageSetting.Order}, xmlStageSetting.Type:{xmlStageSetting.Type}");
             if ((checkPosReference || checkAnglePos1Reference || checkAnglePos2Reference) && xmlStageSetting.Type != TypeValue.位置參數)
@@ -185,6 +213,8 @@ public static class CreateDataBuilder
                     else if (xmlStageSetting.Type == TypeValue.啟動依位置)
                     {
                         callRuleScheme.callPos = poses;
+                        callRuleScheme.callTriggerFlag = CallRuleScheme.CallTriggerFlag.Pos;
+
                     }
                     else if (xmlStageSetting.Type == TypeValue.記錄位置)
                     {
@@ -322,11 +352,11 @@ public static class CreateDataBuilder
                 {
                     TestEnd("table:" + xmlStageSetting.table + "     order:" + xmlStageSetting.Order);
                 }
-                else if (stageSetting.type == TypeValue.對話 && !LoadCtrl.Instance.pool.dialogPoolList.Any(r => r.name == xmlStageSetting.ParamVals[0]))
+                else if (stageSetting.type == TypeValue.對話 && !LoadCtrl.Instance.pool.dialogDict.ContainsKey(xmlStageSetting.ParamVals[0]))
                 {
                     TestEnd("table:" + xmlStageSetting.table + "     order:" + xmlStageSetting.Order);
                 }
-                else if (stageSetting.type == TypeValue.播放音樂 && !LoadCtrl.Instance.pool.musicPoolList.Any(r => r.name == xmlStageSetting.ParamVals[0]))
+                else if (stageSetting.type == TypeValue.播放音樂 && !LoadCtrl.Instance.pool.musicDict.ContainsKey(xmlStageSetting.ParamVals[0]))
                 {
                     TestEnd("table:" + xmlStageSetting.table + "     order:" + xmlStageSetting.Order);
                 }
@@ -334,11 +364,11 @@ public static class CreateDataBuilder
             }
             else if (xmlStageSetting.Type == TypeValue.動畫)
             {
-                if (stageSetting.type == TypeValue.標題 && !LoadCtrl.Instance.pool.titlePoolList.Any(r => r.name == xmlStageSetting.ParamVals[0]))
+                if (stageSetting.type == TypeValue.標題 && !LoadCtrl.Instance.pool.titleDict.ContainsKey(xmlStageSetting.ParamVals[0]))
                 {
                     TestEnd("table:" + xmlStageSetting.table + "     order:" + xmlStageSetting.Order);
                 }
-                else if (stageSetting.type == TypeValue.符卡 && !LoadCtrl.Instance.pool.spellPoolList.Any(r => r.name == xmlStageSetting.ParamVals[0]))
+                else if (stageSetting.type == TypeValue.符卡 && !LoadCtrl.Instance.pool.spellDict.ContainsKey(xmlStageSetting.ParamVals[0]))
                 {
                     TestEnd("table:" + xmlStageSetting.table + "     order:" + xmlStageSetting.Order);
                 }
@@ -355,7 +385,7 @@ public static class CreateDataBuilder
 
             else if (xmlStageSetting.Type == TypeValue.Sprite)
             {
-                if (!LoadCtrl.Instance.pool.spritePoolList.Any(r => r.name == xmlStageSetting.ParamVals[0]))
+                if (!LoadCtrl.Instance.pool.spriteDict.ContainsKey(xmlStageSetting.ParamVals[0]))
                 {
                     TestEnd("table:" + xmlStageSetting.table + "     order:" + xmlStageSetting.Order);
                 }
@@ -367,17 +397,10 @@ public static class CreateDataBuilder
             }
             else if (xmlStageSetting.Type == TypeValue.啟動依ID)
             {
+                checkCallById = true;
                 callRuleScheme = new CallRuleScheme();
-                if (createStageSetting.coreSetting.Id == stageSetting.Id)
-                {
-                    callRuleScheme.createStageSetting = createStageSetting;
-                }
-                else
-                {
-                    callRuleScheme.coreId = createStageSetting.coreSetting.Id;
-                    callRuleScheme.actId = stageSetting.Id;
-                }
-
+                callRuleScheme.callTriggerFlag = CallRuleScheme.CallTriggerFlag.IdTime;
+                CallRuleSchemeCallTargetSet(xmlStageSetting);
                 StrToValFunc.Set(xmlStageSetting.ParamVals[0], ref callRuleScheme.callExistId);
                 callRuleSchemeById.Add(callRuleScheme);
             }
@@ -391,6 +414,8 @@ public static class CreateDataBuilder
             }
             else if (xmlStageSetting.Type == TypeValue.加ID)
             {
+                if (stageSetting.addIds == null)
+                    stageSetting.addIds = new List<uint>();
                 stageSetting.addIds.Add(uint.Parse(xmlStageSetting.ParamVals[0]));
             }
             else if (xmlStageSetting.Type == TypeValue.啟動依遊戲時間)
@@ -418,10 +443,18 @@ public static class CreateDataBuilder
                     callRuleScheme.callStartAfTime = 1;
                     // Debug.LogError("table:" + xmlStageSetting.table + "     order:" + xmlStageSetting.Order + ", callStartAfTime0");
                 }
+                if (callRuleScheme.callTriggerFlag == CallRuleScheme.CallTriggerFlag.None)
+                {
+                    Debug.LogError("table:" + xmlStageSetting.table + "     order:" + xmlStageSetting.Order + ", CallTriggerFlag.None");
+                }
             }
             else if (xmlStageSetting.Type == TypeValue.啟動依結束時間前)
             {
                 StrToValFunc.Set(xmlStageSetting.ParamVals[0], ref callRuleScheme.callEndBfTime);
+                if (callRuleScheme.callTriggerFlag == CallRuleScheme.CallTriggerFlag.None)
+                {
+                    Debug.LogError("table:" + xmlStageSetting.table + "     order:" + xmlStageSetting.Order + ", CallTriggerFlag.None");
+                }
             }
             else if (xmlStageSetting.Type == TypeValue.行動時間)
             {
@@ -519,7 +552,7 @@ public static class CreateDataBuilder
             }
             else if (xmlStageSetting.Type == TypeValue.是界內)
             {
-                stageSetting.isIn = true;
+                stageSetting.isIn = BoolState.True;
             }
             else if (xmlStageSetting.Type == TypeValue.旋轉是移動角度)
             {
@@ -560,10 +593,10 @@ public static class CreateDataBuilder
 
         callRuleSchemesByGTime.Sort((x, y) =>
         {
-            if (x.callGameTime == null && y.callGameTime == null) return 0;
-            if (x.callGameTime == null) return 1;
-            if (y.callGameTime == null) return -1;
-            return x.callGameTime.Value.CompareTo(y.callGameTime.Value);
+            if (InvalidHelper.IsInvalid(x.callGameTime)&& InvalidHelper.IsInvalid(y.callGameTime)) return 0;
+            if (InvalidHelper.IsInvalid(x.callGameTime)) return 1;
+            if (InvalidHelper.IsInvalid(y.callGameTime)) return -1;
+            return x.callGameTime.CompareTo(y.callGameTime);
         });
     }
 

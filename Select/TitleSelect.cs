@@ -6,7 +6,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using System.Collections.Generic;
 public class TitleSelect : SelectBase<TitleSelect, TextOption>
@@ -21,7 +21,7 @@ public class TitleSelect : SelectBase<TitleSelect, TextOption>
             {
                 case TextName.開始遊戲:
                     GameSelect.practiceId = 0;
-                    GameReplay.playKeys = null;
+                    GameReplay.isReplayMode = false;
                     DifficultSelect.Instance.Show();
                     DifficultSelect.Instance.SetNextAction(() =>
                     {
@@ -33,7 +33,7 @@ public class TitleSelect : SelectBase<TitleSelect, TextOption>
                     });
                     break;
                 case TextName.彈幕練習:
-                    GameReplay.playKeys = null;
+                    GameReplay.isReplayMode = false;
                     DifficultSelect.Instance.Show();
                     DifficultSelect.Instance.SetNextAction(() =>
                     {

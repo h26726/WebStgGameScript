@@ -7,14 +7,11 @@ using static PlayerKeyHelper;
 using static SaveJsonData;
 using System;
 using System.Linq;
-using UnityEngine.UI;
 using System.Collections.Generic;
+using System.IO;
 
-public class EnemyShotUnitProp : ShotUnitProp
+public class EnemyBossCtrlObj : EnemyCtrlObj
 {
-    public EnemyShotUnitProp(UnitCtrlBase unitCtrl) : base(unitCtrl)
-    {
-    }
     
 }
 

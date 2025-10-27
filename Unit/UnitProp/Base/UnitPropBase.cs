@@ -4,7 +4,7 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using UnityEngine.UI;
@@ -12,22 +12,22 @@ using System.Collections.Generic;
 
 public abstract class UnitPropBase
 {
-    public UnitCtrlObj unitCtrlObj;
+
+    public float restoreDistance { get; set; }
+
+    public bool isAllowCollision { get; set; }
+    public bool isThrough { get; set; }
+    public bool isInvincible { get; set; }
+    public bool rotateIsMoveAngle { get; set; }
+
+    public float moveAngle { get; set; }
+    public float speed { get; set; }
     public UnitPropBase parent;
-    public float restoreDistance { get; set; } = DEFAULT_RESTORE_DIS;
+    public List<UnitPropBase> relatChildProps { get; set; }
+    public List<CreateStageSetting> propLateDebutByCreateSettings { get; set; }
+    public List<(uint coreId, uint actId, ActionProp actionProp)> propLateCallActs { get; set; }
 
-    public bool isAllowCollision { get; set; } = false;
-    public bool isThrough { get; set; } = false;
-    public bool isInvincible { get; set; } = false;
-    public bool rotateIsMoveAngle { get; set; } = false;
-
-    public float moveAngle { get; set; } = 0f;
-    public float speed { get; set; } = 0f;
-    public List<UnitPropBase> relatChildProps { get; set; } = new List<UnitPropBase>();
-    public List<CreateStageSetting> propWaitDebutByCreateSettings = new List<CreateStageSetting>();
-    public List<(uint coreId, uint actId, ActionProp actionProp)> propWaitCallActs = new List<(uint coreId, uint actId, ActionProp actionProp)>();
-
-
+    public UnitCtrlObj unitCtrlObj;
     private bool _isTriggerDead;
     public bool isTriggerDead
     {
@@ -56,16 +56,13 @@ public abstract class UnitPropBase
     public UnitPropBase(UnitCtrlBase unitCtrl)
     {
         unitCtrlObj = unitCtrl.unitCtrlObj;
+        relatChildProps = new List<UnitPropBase>();
+        propLateDebutByCreateSettings = new List<CreateStageSetting>();
+        propLateCallActs = new List<(uint coreId, uint actId, ActionProp actionProp)>();
+        Reset();
     }
-
-    public void SetParent(UnitCtrlBase parentUnitCtrl)
-    {
-        parent = parentUnitCtrl.unitProp;
-    }
-
     public virtual void Reset()
     {
-        parent = null;
         restoreDistance = DEFAULT_RESTORE_DIS;
         isAllowCollision = false;
         isThrough = false;
@@ -73,35 +70,42 @@ public abstract class UnitPropBase
         rotateIsMoveAngle = false;
         moveAngle = 0f;
         speed = 0f;
+        parent = null;
+
         isDead = false;
-        isTriggerDead = false;
-        isTriggerRestore = false;
+        _isTriggerDead = false;
+        _isTriggerRestore = false;
         relatChildProps.Clear();
-        propWaitDebutByCreateSettings.Clear();
-        propWaitCallActs.Clear();
+        propLateDebutByCreateSettings.Clear();
+        propLateCallActs.Clear();
+    }
+
+    public void SetParent(UnitCtrlBase parentUnitCtrl)
+    {
+        parent = parentUnitCtrl.unitProp;
     }
 
 
 
     public virtual void RefreshVal(SettingBase setting)
     {
-        if (setting.restoreDistance != null)
+        if (!InvalidHelper.IsInvalid(setting.restoreDistance))
         {
-            restoreDistance = setting.restoreDistance.Value;
+            restoreDistance = setting.restoreDistance;
         }
-        if (setting.rotateIsMoveAngle != null)
+        if (!InvalidHelper.IsInvalid(setting.rotateIsMoveAngle))
         {
-            rotateIsMoveAngle = setting.rotateIsMoveAngle.Value;
-        }
-
-        if (setting.isInvincible != null)
-        {
-            isInvincible = setting.isInvincible.Value;
+            rotateIsMoveAngle = setting.rotateIsMoveAngle == BoolState.True ? true : false;
         }
 
-        if (setting.isThrough != null)
+        if (!InvalidHelper.IsInvalid(setting.isInvincible))
         {
-            isThrough = setting.isThrough.Value;
+            isInvincible = setting.isInvincible == BoolState.True ? true : false;
+        }
+
+        if (!InvalidHelper.IsInvalid(setting.isThrough))
+        {
+            isThrough = setting.isThrough == BoolState.True ? true : false;
         }
     }
 

@@ -4,43 +4,43 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using UnityEngine.UI;
 using System.Collections.Generic;
 
 [Serializable]
-public class SettingBase
+public class SettingBase : IPrintable
 {
-    public uint Id = 0;
-    public float? birthAniSpeed = null;
-    public float? birthAniStart = null;
-    public uint? birthDurTime = null;
+    public uint Id = GameConfig.UINT_INVAILD;
+    public float birthAniSpeed = GameConfig.FLOAT_INVAILD;
+    public float birthAniStart = GameConfig.FLOAT_INVAILD;
+    public uint birthDurTime = GameConfig.UINT_INVAILD;
 
-    public List<uint> addIds = new List<uint>();
-    public string name = null;
-    public bool? isIn = null;
+    public List<uint> addIds = null;
+    public string name = GameConfig.STRING_INVAILD;
+    public BoolState isIn = GameConfig.BOOL_INVAILD;
     public TypeValue type = TypeValue.None;
-    public string obj = null;
-    public string spellAni = null;
-    public string ani = null;
-    public uint? dmg = null;
-    public uint? spellTime = null;
-    public uint? hp = null;
-    public uint? actTime = null;
-    public float? restoreDistance = null;
+    public string obj = GameConfig.STRING_INVAILD;
+    public string spellAni = GameConfig.STRING_INVAILD;
+    public string ani = GameConfig.STRING_INVAILD;
+    public uint dmg = GameConfig.UINT_INVAILD;
+    public uint spellTime = GameConfig.UINT_INVAILD;
+    public uint hp = GameConfig.UINT_INVAILD;
+    public uint actTime = GameConfig.UINT_INVAILD;
+    public float restoreDistance = GameConfig.FLOAT_INVAILD;
 
-    public float? speed = null;
-    public float? addSpeed = null;
-    public float? maxSpeed = null;
-    public float? minSpeed = null;
-    public float? timPosSpeedPoint = null;
-    public float? timPosStartSpeed = null;
-    public float? timPosEndSpeed = null;
-    public uint? timPosTime = null;
+    public float speed = GameConfig.FLOAT_INVAILD;
+    public float addSpeed = GameConfig.FLOAT_INVAILD;
+    public float maxSpeed = GameConfig.FLOAT_INVAILD;
+    public float minSpeed = GameConfig.FLOAT_INVAILD;
+    public float timPosSpeedPoint = GameConfig.FLOAT_INVAILD;
+    public float timPosStartSpeed = GameConfig.FLOAT_INVAILD;
+    public float timPosEndSpeed = GameConfig.FLOAT_INVAILD;
+    public uint timPosTime = GameConfig.UINT_INVAILD;
     public List<Pos> timPosPos = null;
-    public bool? rotateIsMoveAngle = null;
+    public BoolState rotateIsMoveAngle = GameConfig.BOOL_INVAILD;
     public List<Pos> movePos = null;
     public List<AngleSet> moveAngle = null;
     public List<AngleSet> addMoveAngle = null;
@@ -50,120 +50,77 @@ public class SettingBase
     public List<AngleSet> childRotateZ = null;
     public List<AngleSet> childAddRotateZ = null;
 
-    public bool? isThrough = null;
-    public string sprite = null;
-    public uint? restoreTime = null;
-    public uint? deadTime = null;
+    public BoolState isThrough = GameConfig.BOOL_INVAILD;
+    public string sprite = GameConfig.STRING_INVAILD;
+    public uint restoreTime = GameConfig.UINT_INVAILD;
+    public uint deadTime = GameConfig.UINT_INVAILD;
 
-    public bool? isInvincible = null;
-    public uint? callGameTime = null;
-    public uint? playerGameTime = null;
-    public uint? playerShotHzTime = null;
+    public BoolState isInvincible = GameConfig.BOOL_INVAILD;
+    public uint callGameTime = GameConfig.UINT_INVAILD;
+    public uint playerGameTime = GameConfig.UINT_INVAILD;
+    public uint playerShotHzTime = GameConfig.UINT_INVAILD;
 
-    public uint? playerPowerNeed = null;
-    public bool? playerShift = null;
-    public uint? playerShotDelayTime = null;
-    public uint? powerGive = null;
+    public uint playerPowerNeed = GameConfig.UINT_INVAILD;
+    public bool playerShift = false;
+    public uint playerShotDelayTime = GameConfig.UINT_INVAILD;
+    public uint powerGive = GameConfig.UINT_INVAILD;
 
-    public List<Pos> relatPos = new List<Pos>();
-    public List<AngleSet> recordAngle = new List<AngleSet>();
-    public List<Pos> recordPos = new List<Pos>();
-    public uint? recordPosId = null;
-    public uint? recordAngleId = null;
+    public List<Pos> relatPos = null;
+    public List<AngleSet> recordAngle = null;
+    public List<Pos> recordPos = null;
+    public uint recordPosId = GameConfig.UINT_INVAILD;
+    public uint recordAngleId = GameConfig.UINT_INVAILD;
 
     public string Print()
     {
         string str = $"  [s] [StageSetting Id= {Id}] {Environment.NewLine}";
 
-        if (name != null) str += $"  [s] Name= {name}{Environment.NewLine}";
-        if (isIn != null) str += $"  [s] isIn= {isIn}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(name)) str += $"  [s] Name= {name}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(isIn)) str += $"  [s] isIn= {isIn}{Environment.NewLine}";
         if (type != TypeValue.None) str += $"  [s] Type= {type}{Environment.NewLine}";
-        if (obj != null) str += $"  [s] Obj= {obj}{Environment.NewLine}";
-        if (ani != null) str += $"  [s] Ani= {ani}{Environment.NewLine}";
-        if (dmg != null) str += $"  [s] Dmg= {dmg}{Environment.NewLine}";
-        if (hp != null) str += $"  [s] Hp= {hp}{Environment.NewLine}";
-        if (actTime != null) str += $"  [s] ActTime= {actTime}{Environment.NewLine}";
-        if (restoreDistance != null) str += $"  [s] RestoreDistance= {restoreDistance}{Environment.NewLine}";
-        if (speed != null) str += $"  [s] Speed= {speed}{Environment.NewLine}";
-        if (addSpeed != null) str += $"  [s] AddSpeed= {addSpeed}{Environment.NewLine}";
-        if (maxSpeed != null) str += $"  [s] MaxSpeed= {maxSpeed}{Environment.NewLine}";
-        if (minSpeed != null) str += $"  [s] MinSpeed= {minSpeed}{Environment.NewLine}";
-        if (timPosSpeedPoint != null) str += $"  [s] timPosSpeedPoint= {timPosSpeedPoint}{Environment.NewLine}";
-        if (timPosStartSpeed != null) str += $"  [s] timPosStartSpeed= {timPosStartSpeed}{Environment.NewLine}";
-        if (timPosEndSpeed != null) str += $"  [s] timPosEndSpeed= {timPosEndSpeed}{Environment.NewLine}";
-        if (rotateIsMoveAngle != null) str += $"  [s] RotateIsMoveAngle= {rotateIsMoveAngle}{Environment.NewLine}";
-        if (isThrough != null) str += $"  [s] isThrough= {isThrough}{Environment.NewLine}";
-        if (sprite != null) str += $"  [s] Sprite= {sprite}{Environment.NewLine}";
-        if (restoreTime != null) str += $"  [s] RestoreTime= {restoreTime}{Environment.NewLine}";
-        if (deadTime != null) str += $"  [s] DeadTime= {deadTime}{Environment.NewLine}";
-        if (timPosTime != null) str += $"  [s] timPosTime= {timPosTime}{Environment.NewLine}";
-        if (isInvincible != null) str += $"  [s] isInvincible= {isInvincible}{Environment.NewLine}";
-        if (callGameTime != null) str += $"  [s] CallGameTime= {callGameTime}{Environment.NewLine}";
-        if (playerGameTime != null) str += $"  [s] PlayerGameTime= {playerGameTime}{Environment.NewLine}";
-        if (playerShotHzTime != null) str += $"  [s] PlayerShotHzTime= {playerShotHzTime}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(obj)) str += $"  [s] Obj= {obj}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(ani)) str += $"  [s] Ani= {ani}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(dmg)) str += $"  [s] Dmg= {dmg}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(hp)) str += $"  [s] Hp= {hp}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(actTime)) str += $"  [s] ActTime= {actTime}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(restoreDistance)) str += $"  [s] RestoreDistance= {restoreDistance}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(speed)) str += $"  [s] Speed= {speed}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(addSpeed)) str += $"  [s] AddSpeed= {addSpeed}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(maxSpeed)) str += $"  [s] MaxSpeed= {maxSpeed}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(minSpeed)) str += $"  [s] MinSpeed= {minSpeed}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(timPosSpeedPoint)) str += $"  [s] timPosSpeedPoint= {timPosSpeedPoint}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(timPosStartSpeed)) str += $"  [s] timPosStartSpeed= {timPosStartSpeed}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(timPosEndSpeed)) str += $"  [s] timPosEndSpeed= {timPosEndSpeed}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(rotateIsMoveAngle)) str += $"  [s] RotateIsMoveAngle= {rotateIsMoveAngle}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(isThrough)) str += $"  [s] isThrough= {isThrough}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(sprite)) str += $"  [s] Sprite= {sprite}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(restoreTime)) str += $"  [s] RestoreTime= {restoreTime}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(deadTime)) str += $"  [s] DeadTime= {deadTime}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(timPosTime)) str += $"  [s] timPosTime= {timPosTime}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(isInvincible)) str += $"  [s] isInvincible= {isInvincible}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(callGameTime)) str += $"  [s] CallGameTime= {callGameTime}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(playerGameTime)) str += $"  [s] PlayerGameTime= {playerGameTime}{Environment.NewLine}";
+        if (!InvalidHelper.IsInvalid(playerShotHzTime)) str += $"  [s] PlayerShotHzTime= {playerShotHzTime}{Environment.NewLine}";
 
-        if (movePos != null)
+        void PrintList<T>(string label, System.Collections.Generic.List<T> list) where T : IPrintable
         {
-            str += $"  [s] MovePos {Environment.NewLine}";
-            foreach (var item in movePos)
+            if (list != null)
             {
-                str += $"{item.Print()}{Environment.NewLine}";
+                str += $"  [s] {label} {Environment.NewLine}";
+                foreach (var item in list)
+                {
+                    str += $"{item.Print()}{Environment.NewLine}";
+                }
             }
         }
 
-        if (moveAngle != null)
-        {
-            str += $"  [s] MoveAngle {Environment.NewLine}";
-            foreach (var item in moveAngle)
-            {
-                str += $"{item.Print()}{Environment.NewLine}";
-            }
-        }
-
-        if (addMoveAngle != null)
-        {
-            str += $"  [s] AddMoveAngle {Environment.NewLine}";
-            foreach (var item in addMoveAngle)
-            {
-                str += $"{item.Print()}{Environment.NewLine}";
-            }
-        }
-
-        if (rotateZ != null)
-        {
-            str += $"  [s] MoveAngle {Environment.NewLine}";
-            foreach (var item in rotateZ)
-            {
-                str += $"{item.Print()}{Environment.NewLine}";
-            }
-        }
-
-        if (addRotateZ != null)
-        {
-            str += $"  [s] AddRotateZ {Environment.NewLine}";
-            foreach (var item in addRotateZ)
-            {
-                str += $"{item.Print()}{Environment.NewLine}";
-            }
-        }
-
-        if (relatPos != null)
-        {
-            str += $"  [s] RelatPos {Environment.NewLine}";
-            foreach (var item in relatPos)
-            {
-                str += $"{item.Print()}{Environment.NewLine}";
-            }
-        }
-
-        if (timPosPos != null)
-        {
-            str += $"  [s] timPosPos {Environment.NewLine}";
-            foreach (var item in timPosPos)
-            {
-                str += $"{item.Print()}{Environment.NewLine}";
-            }
-        }
+        PrintList("MovePos", movePos);
+        PrintList("MoveAngle", moveAngle);
+        PrintList("AddMoveAngle", addMoveAngle);
+        PrintList("RotateZ", rotateZ);
+        PrintList("AddRotateZ", addRotateZ);
+        PrintList("RelatPos", relatPos);
+        PrintList("timPosPos", timPosPos);
 
         return str;
     }

@@ -6,13 +6,6 @@ using UnityEngine;
 
 public class ObjectPoolCtrl : SingletonBase<ObjectPoolCtrl>
 {
-    public Dictionary<string, Stack<UnitCtrlBase>> objectDict;
-    public Dictionary<string, Animator> titleDict;
-    public Dictionary<string, Animator[]> spellDict;
-    public Dictionary<string, DialogCtrl> dialogDict;
-    public Coroutine loopBGMCoroutine;
-
-
     [Serializable]
     public class ObjectPoolClass
     {
@@ -26,10 +19,6 @@ public class ObjectPoolCtrl : SingletonBase<ObjectPoolCtrl>
 
         public uint count = 1;
     }
-
-    public List<ObjectPoolClass> objectPoolList;
-
-
     [Serializable]
     public class TitlePoolClass
     {
@@ -68,11 +57,6 @@ public class ObjectPoolCtrl : SingletonBase<ObjectPoolCtrl>
 
     }
 
-    public List<SpellPoolClass> spellPoolList;
-    public List<TitlePoolClass> titlePoolList;
-    public List<DialogPoolClass> dialogPoolList;
-
-
     [Serializable]
     public class SpritePoolClass
     {
@@ -84,9 +68,6 @@ public class ObjectPoolCtrl : SingletonBase<ObjectPoolCtrl>
         public Sprite sprite;
 
     }
-
-    public List<SpritePoolClass> spritePoolList;
-
     [Serializable]
     public class MusicPoolClass
     {
@@ -98,10 +79,43 @@ public class ObjectPoolCtrl : SingletonBase<ObjectPoolCtrl>
         public AudioClip obj;
         public float loopStart;
         public float loopEnd;
-
     }
-    public List<MusicPoolClass> musicPoolList;
 
+    public Dictionary<string, Animator> titleDict;
+    public Dictionary<string, Animator[]> spellDict;
+    public Dictionary<string, DialogCtrl> dialogDict;
+    public Dictionary<string, Sprite> spriteDict;
+    public Dictionary<string, (AudioClip, float, float)> musicDict;
+    public List<ObjectPoolClass> objectPoolList;
+    public List<SpellPoolClass> spellPoolList;
+    public List<TitlePoolClass> titlePoolList;
+    public List<DialogPoolClass> dialogPoolList;
+    public List<SpritePoolClass> spritePoolList;
+    public List<MusicPoolClass> musicPoolList;
+    public Dictionary<string, Stack<UnitCtrlBase>> objectDict;
+    public Coroutine loopBGMCoroutine;
+
+    protected override void Awake(){
+        base.Awake();
+        // titleDict
+        titleDict = titlePoolList.ToDictionary(item => item.name, item => item.ani);
+
+        // spellDict
+        spellDict = spellPoolList.ToDictionary(item => item.name, item => new Animator[] { item.ani, item.bgAni });
+
+        // dialogDict
+        dialogDict = dialogPoolList.ToDictionary(item => item.name, item => item.dialogCtrl);
+        spriteDict = spritePoolList.ToDictionary(item => item.name, item => item.sprite);
+        musicDict = musicPoolList.ToDictionary(item => item.name, item => (item.obj, item.loopStart, item.loopEnd));
+    }
+
+    public void LogNum()
+    {
+        foreach (var item in objectDict)
+        {
+            Debug.Log($"pool:{item.Key} num:{item.Value.Count}");
+        }
+    }
 
     public IEnumerator Init()
     {
@@ -116,7 +130,7 @@ public class ObjectPoolCtrl : SingletonBase<ObjectPoolCtrl>
                 tmpGameObject = Instantiate(item.obj, transform);
                 var unitCtrlObj = tmpGameObject.GetComponent<UnitCtrlObj>();
                 unitCtrlObj.CloseUnit();
-                var unitCtrlBase = UnitCtrlFactory.InitSelfAndCollision(unitCtrlObj);
+                var unitCtrlBase = UnitCtrlFactory.Init(unitCtrlObj);
                 unitCtrlBase.externalPoolName = item.name;
                 if (item.name == "Player1")
                 {
@@ -134,47 +148,25 @@ public class ObjectPoolCtrl : SingletonBase<ObjectPoolCtrl>
             }
             objectDict.Add(item.name, tmpList);
         }
-
-        titleDict = new Dictionary<string, Animator>();
-
-        foreach (var item in titlePoolList)
-        {
-            titleDict.Add(item.name, item.ani);
-        }
-
-        spellDict = new Dictionary<string, Animator[]>();
-
-        foreach (var item in spellPoolList)
-        {
-            spellDict.Add(item.name, new Animator[] { item.ani, item.bgAni });
-        }
-
-        dialogDict = new Dictionary<string, DialogCtrl>();
-
-        foreach (var item in dialogPoolList)
-        {
-            dialogDict.Add(item.name, item.dialogCtrl);
-        }
-
         yield break;
     }
 
     public void PlayBgm(string bgm, Action callback = null)
     {
         LoadCtrl.Instance.audioSource.Stop();
-        var stageSetting = musicPoolList.FirstOrDefault(r => r.name == bgm);
-        LoadCtrl.Instance.audioSource.clip = stageSetting.obj;
+        var (clip,loopStart,loopEnd) = musicDict[bgm];
+        LoadCtrl.Instance.audioSource.clip = clip;
         StartCoroutine(DelayPlay(callback));
         if (loopBGMCoroutine != null)
         {
             StopCoroutine(loopBGMCoroutine);
         }
-        loopBGMCoroutine = StartCoroutine(LoopSection(stageSetting.loopStart, stageSetting.loopEnd));
+        loopBGMCoroutine = StartCoroutine(LoopSection(loopStart, loopEnd));
     }
 
     public void PlayTitle(string ani)
     {
-        AnimationHelper.PlayAniCoroutine(titleDict[ani]);
+        this.StartCoroutine(AnimationHelper.PlayAniCoroutine(titleDict[ani]));
     }
 
     public void PlayDialog(string obj, uint Id)
@@ -215,7 +207,6 @@ public class ObjectPoolCtrl : SingletonBase<ObjectPoolCtrl>
             return null;
         }
         var unitCtrlBase = objectDict[ObjPoolName].Pop();
-        unitCtrlBase.externalPoolName = ObjPoolName;
         return unitCtrlBase;
     }
 

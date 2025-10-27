@@ -11,7 +11,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using System.Linq;
 using static LoadCtrl;
@@ -19,10 +19,16 @@ using static LoadCtrl;
 public static class GameProgressStageCtrl
 {
 
-    public static uint nowGTimeCallRuleSchemeKey = 0;
     public static uint gTime = 0;
+    public static uint nowGTimeCallRuleSchemeKey = 0;
 
-    public static void Init()
+    public static void Reset()
+    {
+        gTime = 0;
+        nowGTimeCallRuleSchemeKey = 0;
+    }
+
+    public static void GameStartSet()
     {
         if (GameSelect.isPracticeMode)
         {
@@ -51,10 +57,17 @@ public static class GameProgressStageCtrl
     static void PlayStartBgmByGTime()
     {
         if (gTime == 0)
+        {
+            LoadCtrl.Instance.pool.PlayBgm(GameSelect.bgm);
             return;
+        }
 
+        // 取得 BGM 名稱
         var bgm = GameConfig.CONFIG_PARAMS.FirstOrDefault(r => r.key == "BGM")?.text;
-        var bgmStart = GameConfig.CONFIG_PARAMS.FirstOrDefault(r => r.key == "BGMStart")?.intVal;
+        // 取得 BGM 開始幀數，若沒設定則用無效值
+        int bgmStart = GameConfig.CONFIG_PARAMS.FirstOrDefault(r => r.key == "BGMStart")?.intVal
+                       ?? GameConfig.INT_INVAILD;
+
         if (!string.IsNullOrEmpty(bgm))
         {
             LoadCtrl.Instance.pool.PlayBgm(bgm, () =>
@@ -68,16 +81,19 @@ public static class GameProgressStageCtrl
         }
     }
 
-    static void SetBgmStartSecond(int? bgmStart)
+    static void SetBgmStartSecond(int bgmStart)
     {
-        int frameTime = bgmStart ?? (int)gTime;
+        // 如果 bgmStart 是無效值，就用 gTime
+        int frameTime = InvalidHelper.IsInvalid(bgmStart) ? (int)gTime : bgmStart;
+
+        // 設定音樂播放時間
         LoadCtrl.Instance.audioSource.time = frameTime / (float)GameConfig.TARGET_FRAME_RATE;
     }
     static uint InitGTimeByConfig()
     {
         var gameTimeConfig = GameConfig.CONFIG_PARAMS.FirstOrDefault(r => r.key == "GameTime");
-        return gameTimeConfig != null && gameTimeConfig.intVal.HasValue
-            ? (uint)gameTimeConfig.intVal.Value
+        return gameTimeConfig != null && !InvalidHelper.IsInvalid(gameTimeConfig.intVal)
+            ? (uint)gameTimeConfig.intVal
             : 0;
     }
     public static void UpdateHandler()
@@ -93,9 +109,9 @@ public static class GameProgressStageCtrl
             {
                 QueneDebutHandle(createStageSetting);
             }
-            else if (coreId != null && actId != null)
+            else if (InvalidHelper.IsInvalid(coreId) && InvalidHelper.IsInvalid(actId))
             {
-                GameDebut.waitCallActs.Add((coreId.Value, actId.Value));
+                GameDebut.lateCallActs.Add((coreId, actId));
             }
             nowGTimeCallRuleSchemeKey++;
         }
@@ -159,7 +175,7 @@ public static class GameProgressStageCtrl
                 GameMainCtrl.Instance.EnterBossTime(createStageSetting, coreSetting);
                 break;
             default:
-                GameDebut.waitDebutByCreateSettings.Add(createStageSetting);
+                GameDebut.lateDebutByCreateSettings.Add(createStageSetting);
                 break;
         }
     }

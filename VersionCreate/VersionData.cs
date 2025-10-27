@@ -8,7 +8,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System.Linq;
 using System.IO;
 using System.Xml;
@@ -16,49 +16,47 @@ using System.Xml;
 [Serializable]
 public class VersionData
 {
-    
-    public VersionData(string version, VersionGetType getType)
+
+
+    public VersionData(string version)
     {
         this.version = version;
-        if (getType == VersionGetType.InsideCreateByXml)
-        {
-            dialogSettings = ReadDialogXML(GameConfig.CONFIG_FILE_STR_DIALOG);
-            practiceSettings = ReadPracticeXML(GameConfig.CONFIG_FILE_STR_PRACTICE);
-            playerDatas = GetPlayerDatas();
-            stageDatas = GetStageDatas();
-            powerData = new PowerData(GameConfig.CONFIG_FILE_STR_POWER);
-        }
-        else
-        {
-
-        }
+        this.dialogSettings = ReadDialogXML(version, GameConfig.CONFIG_FILE_STR_DIALOG);
+        this.practiceSettings = ReadPracticeXML(version, GameConfig.CONFIG_FILE_STR_PRACTICE);
+        this.playerDatas = GetPlayerDatas(version);
+        this.stageDatas = GetStageDatas(version);
+        var powerData = new PowerData();
+        powerData.Set(version, GameConfig.CONFIG_FILE_STR_POWER);
+        this.powerData = powerData;
     }
 
-    public List<PlayerData> playerDatas = new List<PlayerData>();
-
-    public List<StageData> stageDatas = new List<StageData>();
-
-    public PowerData powerData = null;
-
-    public List<PracticeSetting> practiceSettings = new List<PracticeSetting>();
-    public List<DialogSetting> dialogSettings;
     public string version;
+    public List<PlayerData> playerDatas;
 
-    public List<PlayerData> GetPlayerDatas()
+    public List<StageData> stageDatas;
+
+    public PowerData powerData;
+
+    public List<PracticeSetting> practiceSettings;
+    public List<DialogSetting> dialogSettings;
+
+    public List<PlayerData> GetPlayerDatas(string version)
     {
-        Debug.Log("ameConfig.PLAYER_LIST.Count:" + GameConfig.PLAYER_LIST.Count);
+        // Debug.Log("ameConfig.PLAYER_LIST.Count:" + GameConfig.PLAYER_LIST.Count);
 
-        foreach (var item in GameConfig.PLAYER_LIST)
-        {
-            Debug.Log("item.text:" + item.text);
-        }
+        // foreach (var item in GameConfig.PLAYER_LIST)
+        // {
+        //     Debug.Log("item.text:" + item.text);
+        // }
         var playerFileNames = GameConfig.PLAYER_LIST.Select(r => r.text).ToList();
         var newPlayerDatas = new List<PlayerData>();
         if (playerFileNames.Count > 0)
         {
             foreach (var playerFileName in playerFileNames)
             {
-                newPlayerDatas.Add(new PlayerData(playerFileName));
+                var playerData = new PlayerData();
+                playerData.Set(version, playerFileName);
+                newPlayerDatas.Add(playerData);
             }
 
         }
@@ -71,69 +69,128 @@ public class VersionData
         // string jsonStr = JsonHelper.ToJson(playerAndPowerCreateStageSettings.ToArray());
     }
 
-    public List<StageData> GetStageDatas()
+    public List<StageData> GetStageDatas(string version)
     {
         var newStageDatas = new List<StageData>();
         for (int i = 0; i < 7; i++)
         {
             foreach (Difficult difficulty in Enum.GetValues(typeof(Difficult)))
             {
-                var stageData = new StageData((uint)i, difficulty);
+                var stageData = new StageData();
+                stageData.Set(version, (uint)i, difficulty);
                 newStageDatas.Add(stageData);
             }
         }
         return newStageDatas;
     }
 
-    
-    public List<DialogSetting> ReadDialogXML(string name)
+
+    public static List<DialogSetting> ReadDialogXML(string version, string name)
     {
         var list = new List<DialogSetting>();
-        TextAsset xmlAsset = Resources.Load<TextAsset>($"Setting/{name}");
-        if (xmlAsset != null)
+        try
         {
+            TextAsset xmlAsset = Resources.Load<TextAsset>($"Setting/{version}/{name}");
+            if (xmlAsset == null)
+            {
+                Debug.LogWarning($"[ReadDialogXML] XML 檔案不存在: Setting/{version}/{name}");
+                return list;
+            }
+
             XmlDocument xml = new XmlDocument();
             xml.LoadXml(xmlAsset.text);
 
-            XmlNodeList nodeList = xml.SelectSingleNode("root").ChildNodes;
-            foreach (XmlElement xe in nodeList)
+            XmlNode root = xml.SelectSingleNode("root");
+            if (root == null)
             {
-                var dialogSetting = new DialogSetting { };
-                StrToValFunc.Set(xe.GetAttribute("Id"), ref dialogSetting.Id);
-                StrToValFunc.Set(xe.GetAttribute("MainId"), ref dialogSetting.mainId);
-                StrToValFunc.Set(xe.GetAttribute("Text"), ref dialogSetting.text);
-                StrToValFunc.Set(xe.GetAttribute("LeftAni"), ref dialogSetting.leftAni);
-                StrToValFunc.Set(xe.GetAttribute("RightAni"), ref dialogSetting.rightAni);
-                StrToValFunc.Set(xe.GetAttribute("Bgm"), ref dialogSetting.bgm);
+                Debug.LogWarning($"[ReadDialogXML] root 節點缺失: {name}");
+                return list;
+            }
 
-                list.Add(dialogSetting);
+            foreach (XmlElement xe in root.ChildNodes)
+            {
+                try
+                {
+                    var dialogSetting = new DialogSetting();
+
+                    StrToValFunc.Set(xe.GetAttribute("Id"), ref dialogSetting.Id);
+                    StrToValFunc.Set(xe.GetAttribute("MainId"), ref dialogSetting.mainId);
+                    StrToValFunc.Set(xe.GetAttribute("Text"), ref dialogSetting.text);
+                    StrToValFunc.Set(xe.GetAttribute("LeftAni"), ref dialogSetting.leftAni);
+                    StrToValFunc.Set(xe.GetAttribute("RightAni"), ref dialogSetting.rightAni);
+                    StrToValFunc.Set(xe.GetAttribute("Bgm"), ref dialogSetting.bgm);
+
+                    list.Add(dialogSetting);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[ReadDialogXML] 無法解析節點 ({name}): {xe.OuterXml}\n{e}");
+                }
             }
         }
+        catch (XmlException e)
+        {
+            Debug.LogError($"[ReadDialogXML] XML 格式錯誤 ({name}): {e}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[ReadDialogXML] 未預期錯誤 ({name}): {e}");
+        }
+
         return list;
     }
 
-
-    public List<PracticeSetting> ReadPracticeXML(string name)
+    public static List<PracticeSetting> ReadPracticeXML(string version, string name)
     {
         var list = new List<PracticeSetting>();
-        TextAsset xmlAsset = Resources.Load<TextAsset>($"Setting/{name}");
-        if (xmlAsset != null)
+        try
         {
+            TextAsset xmlAsset = Resources.Load<TextAsset>($"Setting/{version}/{name}");
+            if (xmlAsset == null)
+            {
+                Debug.LogWarning($"[ReadPracticeXML] XML 檔案不存在: Setting/{version}/{name}");
+                return list;
+            }
+
             XmlDocument xml = new XmlDocument();
             xml.LoadXml(xmlAsset.text);
 
-            XmlNodeList nodeList = xml.SelectSingleNode("root").ChildNodes;
-            foreach (XmlElement xe in nodeList)
+            XmlNode root = xml.SelectSingleNode("root");
+            if (root == null)
             {
-                var practiceSetting = new PracticeSetting { };
-                StrToValFunc.Set(xe.GetAttribute("Id"), ref practiceSetting.Id);
-                StrToValFunc.Set(xe.GetAttribute("Name"), ref practiceSetting.name);
-                StrToValFunc.Set(xe.GetAttribute("BossEnterTime"), ref practiceSetting.bossEnterTime);
-                StrToValFunc.Set(xe.GetAttribute("BossSpellTime"), ref practiceSetting.bossSpellTime);
-                StrToValFunc.Set(xe.GetAttribute("Music"), ref practiceSetting.music);
-                list.Add(practiceSetting);
+                Debug.LogWarning($"[ReadPracticeXML] root 節點缺失: {name}");
+                return list;
+            }
+
+            foreach (XmlElement xe in root.ChildNodes)
+            {
+                try
+                {
+                    var practiceSetting = new PracticeSetting();
+
+                    StrToValFunc.Set(xe.GetAttribute("Id"), ref practiceSetting.Id);
+                    StrToValFunc.Set(xe.GetAttribute("Name"), ref practiceSetting.name);
+                    StrToValFunc.Set(xe.GetAttribute("BossEnterTime"), ref practiceSetting.bossEnterTime);
+                    StrToValFunc.Set(xe.GetAttribute("BossSpellTime"), ref practiceSetting.bossSpellTime);
+                    StrToValFunc.Set(xe.GetAttribute("Music"), ref practiceSetting.music);
+
+                    list.Add(practiceSetting);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[ReadPracticeXML] 無法解析節點 ({name}): {xe.OuterXml}\n{e}");
+                }
             }
         }
+        catch (XmlException e)
+        {
+            Debug.LogError($"[ReadPracticeXML] XML 格式錯誤 ({name}): {e}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[ReadPracticeXML] 未預期錯誤 ({name}): {e}");
+        }
+
         return list;
     }
 

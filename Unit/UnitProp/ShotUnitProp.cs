@@ -10,11 +10,10 @@ using System.Linq;
 using UnityEngine.UI;
 using System.Collections.Generic;
 
-public class EnemyShotUnitProp : ShotUnitProp
+public abstract class ShotUnitProp : UnitPropBase
 {
-    public EnemyShotUnitProp(UnitCtrlBase unitCtrl) : base(unitCtrl)
+    public ShotUnitProp(UnitCtrlBase unitCtrl) : base(unitCtrl)
     {
     }
-    
 }
 

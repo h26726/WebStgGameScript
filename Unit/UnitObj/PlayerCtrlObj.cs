@@ -4,7 +4,7 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -18,9 +18,13 @@ public class PlayerCtrlObj : UnitCtrlObj
 
     public void PlayerAwake()
     {
-        core.SetActive(false);
         coreCollider2D = core.GetComponent<Collider2D>();
         coreSpriteRenderer = core.GetComponent<SpriteRenderer>();
+        PlayerCtrlObjReset();
+    }
+
+    public void PlayerCtrlObjReset(){
+        core.SetActive(false);
     }
 }
 

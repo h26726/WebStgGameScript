@@ -2,36 +2,22 @@ using UnityEngine;
 
 public abstract class SingletonBase<T> : MonoBehaviour where T : SingletonBase<T>
 {
-    private static T _instance;
     private static readonly object _lock = new object();
-    private static bool _applicationIsQuitting = false;
+    public static T Instance;
 
-    public static T Instance
+    protected virtual void Awake()
     {
-        get
+        lock (_lock)
         {
-            if (_applicationIsQuitting) //遊戲正在退出
-                return null;
-
-            lock (_lock)
+            if (Instance == null)
             {
-                if (_instance == null)
-                {
-                    _instance = FindObjectOfType<T>();
-
-                    if (_instance == null)
-                    {
-                        Debug.LogError("Singleton Repeat");
-                    }
-                }
-
-                return _instance;
+                Instance = (T)this;
+            }
+            else if (Instance != this)
+            {
+                Debug.LogWarning($"Duplicate Singleton detected: {typeof(T).Name} on {gameObject.name}. Destroying this duplicate.");
+                Destroy(gameObject);
             }
         }
-    }
-
-    protected virtual void OnDestroy()
-    {
-        _applicationIsQuitting = true;
     }
 }

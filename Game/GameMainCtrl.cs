@@ -11,7 +11,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using System.Linq;
 using static LoadCtrl;
@@ -23,26 +23,39 @@ public partial class GameMainCtrl : SingletonBase<GameMainCtrl>
         None = 0,
         SpellTimeRefresh = 1 << 0,
         WaitPracticeBossDead = 1 << 1,
-        WaitSpellEnd = 1 << 2,
+        LateSpellEnd = 1 << 2,
         Pause = 1 << 3,
+        LatePlayerHpEmptyPause = 1 << 4,
+        LateResetPlayerDef = 1 << 5,
     }
-    public UpdateFlag gameSceneUpdateFlag = UpdateFlag.None;
+    public uint PracticeBossDeadCalTime;
+    public float objLast_zIndex { get; set; }
+    public UpdateFlag gameSceneUpdateFlag;
 
     public GameProgressState nowGameProgressState;
-    public uint PracticeBossDeadCalTime;
 
 
-    public void Init()
+
+
+    public void GameStartSet()
     {
-        nowGameProgressState = GameProgressState.Stage;
-        PlayerSaveData.score = 0;
-        UnitCtrlObj.objLast_zIndex = GameConfig.Z_INDEX_TOP;
-        GameDebut.Init();
-        GamePlayer.SetDef();
-        GameBoss.SetDef();
-        GameProgressStageCtrl.Init();
-        GameReplay.Init();
+        GameDebut.GameStartSet();
+        GameProgressStageCtrl.GameStartSet();
+        GameReplay.GameStartSet();
+    }
+
+    public void Reset()
+    {
         PracticeBossDeadCalTime = 0;
+        objLast_zIndex = GameConfig.Z_INDEX_TOP;
+        gameSceneUpdateFlag = UpdateFlag.None;
+        nowGameProgressState = GameProgressState.Stage;
+    }
+
+    public float Get_zIndex()
+    {
+        objLast_zIndex -= GameConfig.Z_INDEX_REDUCE;
+        return objLast_zIndex;
     }
 
     public void UpdateHandler()
@@ -58,11 +71,12 @@ public partial class GameMainCtrl : SingletonBase<GameMainCtrl>
         {
             GameProgressStageCtrl.UpdateHandler();
         }
+
+        GameDebut.UpdateHandler();
         if (nowGameProgressState == GameProgressState.Dialog)
         {
             DialogCtrl.nowInstance?.UpdateHandler();
         }
-        GameDebut.UpdateHandler();
 
         if (nowGameProgressState == GameProgressState.BossTime)
         {
@@ -77,9 +91,9 @@ public partial class GameMainCtrl : SingletonBase<GameMainCtrl>
                 SpellEndCheck();
             }
 
-            if (gameSceneUpdateFlag.HasFlag(UpdateFlag.WaitSpellEnd))
+            if (gameSceneUpdateFlag.HasFlag(UpdateFlag.LateSpellEnd))
             {
-                gameSceneUpdateFlag &= ~UpdateFlag.WaitSpellEnd;
+                gameSceneUpdateFlag &= ~UpdateFlag.LateSpellEnd;
                 SpellEnd();
             }
 
@@ -96,6 +110,31 @@ public partial class GameMainCtrl : SingletonBase<GameMainCtrl>
         {
             Pause();
             ShowPauseSelect();
+        }
+
+        if (gameSceneUpdateFlag.HasFlag(UpdateFlag.LateResetPlayerDef))
+        {
+            gameSceneUpdateFlag &= ~UpdateFlag.LateResetPlayerDef;
+            GamePlayer.SetDef();
+        }
+
+        if (gameSceneUpdateFlag.HasFlag(UpdateFlag.LatePlayerHpEmptyPause))
+        {
+            gameSceneUpdateFlag &= ~UpdateFlag.LatePlayerHpEmptyPause;
+            gameSceneUpdateFlag |= UpdateFlag.LateResetPlayerDef;
+            if (!GameReplay.isReplayMode)
+            {
+                GameMainCtrl.Instance.Pause();
+                if (GameSelect.isPracticeMode)
+                {
+                    PracticeOverSelect.Instance.Show();
+                }
+                else
+                {
+                    GameOverSelect.Instance.Show();
+                }
+            }
+            Debug.Log("GameReplay Time:" + GameReplay.keyPressTime);
         }
     }
 
@@ -114,34 +153,46 @@ public partial class GameMainCtrl : SingletonBase<GameMainCtrl>
 
     public void SpellEnd()
     {
-        Debug.Log("SpellEnd");
-
-        if (GameBoss.nowUnit == null)
+        // 快取 nowUnit 避免多次屬性存取
+        var GmaeBossUnitCtrl = GameBoss.nowUnit;
+        if (GmaeBossUnitCtrl == null)
         {
             Debug.LogError("GameBoss.nowUnit == null");
             return;
         }
+
+        // 關閉符卡刷新標誌
         gameSceneUpdateFlag &= ~UpdateFlag.SpellTimeRefresh;
 
-        var givePowerNum = GameBoss.nowUnit.coreSetting.powerGive == null ? 0 : GameBoss.nowUnit.coreSetting.powerGive.Value;
-        GameBoss.nowUnit.Reset();//注意會連givePower內容也清除
-        GameBoss.nowUnit.GivePower(givePowerNum);
-        GameDebut.ClearAllEnemyShot();
-        GameObjCtrl.Instance.StopSpell();
-
-        if (GameSelect.isPracticeMode && GameBoss.nowUnit.coreSetting.type == TypeValue.符卡)
+        var coreSetting = GmaeBossUnitCtrl.coreSetting;
+        if (GameSelect.isPracticeMode && coreSetting.type == TypeValue.符卡)
         {
-            GameBoss.nowUnit.enemyProp.isTriggerDead = true;
+            GmaeBossUnitCtrl.enemyProp.isTriggerDead = true;
             gameSceneUpdateFlag |= UpdateFlag.WaitPracticeBossDead;
         }
         else
         {
             nowGameProgressState = GameProgressState.Stage;
         }
+        // 快取 coreSetting 與 powerGive
+        uint originGivePowerNum = !InvalidHelper.IsInvalid(coreSetting.powerGive) ? coreSetting.powerGive : 0;
+        uint originDebutNo = GmaeBossUnitCtrl.debutNo;
 
+        // 保留狀態
+        var keepData = GmaeBossUnitCtrl.KeepData();
+
+        // 重置單位
+        GmaeBossUnitCtrl.Reset();
+        GmaeBossUnitCtrl.SetDef();
+        GmaeBossUnitCtrl.SetKeepData(keepData);
+
+        // 清除所有敵方彈幕
+        GameDebut.ClearAllEnemyShot();
+        GameObjCtrl.Instance.StopSpell();
+
+        // 處理練習模式符卡邏輯
 
     }
-
 
 
 
@@ -151,7 +202,7 @@ public partial class GameMainCtrl : SingletonBase<GameMainCtrl>
         if (IsSpellCardEndTime())
         {
             Debug.Log("SpellEndCheck");
-            GameMainCtrl.Instance.gameSceneUpdateFlag |= UpdateFlag.WaitSpellEnd;
+            GameMainCtrl.Instance.gameSceneUpdateFlag |= UpdateFlag.LateSpellEnd;
         }
     }
 
@@ -183,7 +234,6 @@ public partial class GameMainCtrl : SingletonBase<GameMainCtrl>
 
     public void UnPause()
     {
-        if (!gameSceneUpdateFlag.HasFlag(UpdateFlag.Pause)) return;
         gameSceneUpdateFlag &= ~UpdateFlag.Pause;
         Time.timeScale = 1;
         LoadCtrl.Instance.audioSource.UnPause();
@@ -219,7 +269,7 @@ public partial class GameMainCtrl : SingletonBase<GameMainCtrl>
     public void EnterBossTime(CreateStageSetting createStageSetting, SettingBase coreSetting)
     {
         GameMainCtrl.Instance.nowGameProgressState = GameProgressState.BossTime;
-        GameDebut.waitDebutByCreateSettings.Add(createStageSetting);
+        GameDebut.lateDebutByCreateSettings.Add(createStageSetting);
         if (createStageSetting.type == TypeValue.符卡)
         {
             GameMainCtrl.Instance.gameSceneUpdateFlag |= GameMainCtrl.UpdateFlag.SpellTimeRefresh;

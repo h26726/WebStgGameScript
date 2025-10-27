@@ -4,13 +4,13 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using UnityEngine.UI;
 using System.Collections.Generic;
 
-public class PlayerShotUnitProp : UnitPropBase
+public class PlayerShotUnitProp : ShotUnitProp
 {
     public uint dmg = 0;
 
@@ -27,9 +27,9 @@ public class PlayerShotUnitProp : UnitPropBase
     public override void RefreshVal(SettingBase setting)
     {
         base.RefreshVal(setting);
-        if (setting.dmg != null)
+        if (!InvalidHelper.IsInvalid(setting.dmg))
         {
-            dmg = setting.dmg.Value;
+            dmg = setting.dmg;
         }
     }
 

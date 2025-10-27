@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,8 +11,23 @@ using System.Xml;
 
 public static class GameConfig
 {
+    // public const VersionGetType VERSION_GET_TYPE = VersionGetType.InsideCreateByXml;
+    // public const VersionGetType VERSION_GET_TYPE = VersionGetType.ReadVersionData;
+
+    [Serializable]
+    public class ConfigParam
+    {
+        public string key = null;
+        public string PreLayerNo = null;
+        public Vector2 pos = GameConfig.VECTOR2_INVAILD;
+        public float floatVal = GameConfig.FLOAT_INVAILD;
+        public int intVal = GameConfig.INT_INVAILD;
+        public string text = null;
+        public string text2 = null;
+    }
 
     public const string VERSION = "v1.0";
+    public readonly static string[] VERSIONS = new string[] { "v1.0" };
     public const bool IS_OPEN_DIALOG = true;
     public const bool IS_OPEN_SPELLIMG = true;
 
@@ -80,7 +96,6 @@ public static class GameConfig
     public const float DEFAULT_SHOW_ANI_START = 0f;
 
     public const uint DEFAULT_ENEMY_HP = 1;
-    public const uint DEFAULT_SPELL_TIME = 10;
 
     public const uint DEFAULT_DEADANI_KEY_TIME = 60;
     public const uint DEFAULT_PLAYER_DEADANI_KEY_TIME = 60;
@@ -90,6 +105,20 @@ public static class GameConfig
     public const uint PAUSE_DELAY_TIME = 10;
     public const float RESTORE_DISTANCE_MAX = 100f;
     public const int SELECT_AUTO_CLOSE_TIME = 60;
+    public const int PRACTICE_ROW_PER_COUNT = 7;
+    public const int PRACTICE_ROW_COUNT = 2;
+    public const int PRACTICE_GRID = PRACTICE_ROW_COUNT * PRACTICE_ROW_PER_COUNT;
+
+    public const uint GAME_SELECT_STAGE_KEY_DEF = 6;
+    public const uint GAME_SELECT_PLAYER_ID = 101;
+    public const uint REPLAY_MAX_KEYTIME = 1000000;
+    public const uint UINT_INVAILD = 9999999;
+    public const int INT_INVAILD = 9999999;
+    public const float FLOAT_INVAILD = 9999999f;
+    public const string STRING_INVAILD = "__INVALID__";
+    public const BoolState BOOL_INVAILD = BoolState.Invalid;
+    public static readonly Vector2 VECTOR2_INVAILD = new Vector2(FLOAT_INVAILD, FLOAT_INVAILD);
+    public static readonly Vector3 VECTOR3_INVAILD = new Vector3(FLOAT_INVAILD, FLOAT_INVAILD, FLOAT_INVAILD);
 
 
 
@@ -143,7 +172,7 @@ public static class GameConfig
     public static void SetConfigParamByXml()
     {
         TextAsset xmlAsset = Resources.Load<TextAsset>($"Setting/{GameConfig.CONFIG_FILE_STR_CONFIG}");
-        
+
         CONFIG_PARAMS = new List<ConfigParam>();
         if (xmlAsset != null)
         {
@@ -155,48 +184,37 @@ public static class GameConfig
             {
                 var str = xe.GetAttribute("Str");
                 var preLayerNo = xe.GetAttribute("PreLayerNo");
-
+                var configParam = new ConfigParam();
+                configParam.key = str;
+                configParam.PreLayerNo = preLayerNo;
                 if (!string.IsNullOrEmpty(xe.GetAttribute("Float")))
                 {
                     var floatVal = float.Parse(xe.GetAttribute("Float"));
-                    CONFIG_PARAMS.Add(new ConfigParam
-                    {
-                        key = str,
-                        PreLayerNo = preLayerNo,
-                        floatVal = floatVal,
-                    });
+                    configParam.floatVal = floatVal;
                 }
-                else if (!string.IsNullOrEmpty(xe.GetAttribute("Int")))
+                if (!string.IsNullOrEmpty(xe.GetAttribute("Int")))
                 {
                     var intVal = int.Parse(xe.GetAttribute("Int"));
-                    CONFIG_PARAMS.Add(new ConfigParam
-                    {
-                        key = str,
-                        PreLayerNo = preLayerNo,
-                        intVal = intVal,
-                    });
+                    configParam.intVal = intVal;
+
                 }
-                else if (!string.IsNullOrEmpty(xe.GetAttribute("Pos")))
+                if (!string.IsNullOrEmpty(xe.GetAttribute("Pos")))
                 {
                     var strs = xe.GetAttribute("Pos").Split(',');
                     var pos = new Vector2(float.Parse(strs[0]), float.Parse(strs[1]));
-                    CONFIG_PARAMS.Add(new ConfigParam
-                    {
-                        key = str,
-                        PreLayerNo = preLayerNo,
-                        pos = pos,
-                    });
+                    configParam.pos = pos;
                 }
-                else if (!string.IsNullOrEmpty(xe.GetAttribute("Text")))
+                if (!string.IsNullOrEmpty(xe.GetAttribute("Text")))
                 {
                     var text = xe.GetAttribute("Text");
-                    CONFIG_PARAMS.Add(new ConfigParam
-                    {
-                        key = str,
-                        PreLayerNo = preLayerNo,
-                        text = text,
-                    });
+                    configParam.text = text;
                 }
+                if (!string.IsNullOrEmpty(xe.GetAttribute("Text2")))
+                {
+                    var text2 = xe.GetAttribute("Text2");
+                    configParam.text2 = text2;
+                }
+                CONFIG_PARAMS.Add(configParam);
             }
         }
         else

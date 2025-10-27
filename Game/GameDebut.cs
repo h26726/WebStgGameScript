@@ -11,7 +11,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using System.Linq;
 using static LoadCtrl;
@@ -19,29 +19,54 @@ using static LoadCtrl;
 public static class GameDebut
 {
     public static uint No = 0;
-    public static Dictionary<uint, UnitCtrlBase> poolDictByNo = new Dictionary<uint, UnitCtrlBase>();
-    public static Dictionary<uint, UnitCtrlBase> coreDictById = new Dictionary<uint, UnitCtrlBase>();
+    public static bool isNotDebutEnemyShot;
+    public static Dictionary<uint, UnitCtrlBase> poolDictByNo;
+    public static Dictionary<uint, UnitCtrlBase> coreDictById;
     //取位置用，出現與消失時註冊解註冊
-    public static List<uint> poolNos = new List<uint>();
+    public static List<uint> poolNos;
 
     //TriggerDebut、TriggerRestore在後續統一註冊與解註冊(出池→出現→註冊→消失→解註冊→回池)
-    public static List<(CreateStageSetting createStageSetting, UnitCtrlBase parentUnitCtrl)> waitDebuts = new List<(CreateStageSetting createStageSetting, UnitCtrlBase parentUnitCtrl)>();
-    public static List<UnitCtrlBase> waitRestores = new List<UnitCtrlBase>();
-    public static List<CreateStageSetting> waitDebutByCreateSettings = new List<CreateStageSetting>();
-    public static List<(uint coreId, uint actId)> waitCallActs = new List<(uint coreId, uint actId)>();
-    public static bool isNotDebutEnemyShot;
+    public static List<(CreateStageSetting createStageSetting, UnitCtrlBase parentUnitCtrl)> lateDebuts;
+    public static List<UnitCtrlBase> lateRestores;
+    public static List<CreateStageSetting> lateDebutByCreateSettings;
+    public static List<(uint coreId, uint actId)> lateCallActs;
+
+    public static void GameStartSet()
+    {
+        lateDebutByCreateSettings.Add(GameSelect.playerData.playerCreateStageSetting);
+    }
 
     public static void Init()
     {
-        No = 0;
         poolDictByNo = new Dictionary<uint, UnitCtrlBase>();
-        waitDebutByCreateSettings.Add(GameSelect.playerData.playerCreateStageSetting);
+        coreDictById = new Dictionary<uint, UnitCtrlBase>();
+        //取位置用，出現與消失時註冊解註冊
+        poolNos = new List<uint>();
 
+        //TriggerDebut、TriggerRestore在後續統一註冊與解註冊(出池→出現→註冊→消失→解註冊→回池)
+        lateDebuts = new List<(CreateStageSetting createStageSetting, UnitCtrlBase parentUnitCtrl)>();
+        lateRestores = new List<UnitCtrlBase>();
+        lateDebutByCreateSettings = new List<CreateStageSetting>();
+        lateCallActs = new List<(uint coreId, uint actId)>();
+        Reset();
+    }
+
+    public static void Reset()
+    {
+        No = 0;
+        isNotDebutEnemyShot = false;
+        poolDictByNo.Clear();
+        coreDictById.Clear();
+        poolNos.Clear();
+        lateDebuts.Clear();
+        lateRestores.Clear();
+        lateDebutByCreateSettings.Clear();
+        lateCallActs.Clear();
     }
 
     public static void AddQueueDebut(CreateStageSetting createStageSetting, UnitCtrlBase parentUnitCtrl)
     {
-        waitDebuts.Add((createStageSetting, parentUnitCtrl));
+        lateDebuts.Add((createStageSetting, parentUnitCtrl));
     }
 
     public static void SetNo(UnitCtrlBase unitCtrlBase)
@@ -52,13 +77,13 @@ public static class GameDebut
 
     public static void AddQueueRestore(UnitCtrlBase unitCtrlBase)
     {
-        waitRestores.Add(unitCtrlBase);
+        lateRestores.Add(unitCtrlBase);
     }
 
     public static void UpdateHandler()
     {
-        TriggerDebuts(waitDebutByCreateSettings);
-        TriggerCallActs(waitCallActs);
+        TriggerDebuts(lateDebutByCreateSettings);
+        TriggerCallActs(lateCallActs);
         for (int i = 0; i < poolNos.Count; i++)
         {
             var unitCtrl = poolDictByNo[poolNos[i]];
@@ -70,25 +95,25 @@ public static class GameDebut
             }
             if (isAllowDebut(unitCtrl))
             {
-                TriggerDebuts(unitProp.propWaitDebutByCreateSettings, unitCtrl);
+                TriggerDebuts(unitProp.propLateDebutByCreateSettings, unitCtrl);
             }
-            TriggerCallActs(unitProp.propWaitCallActs, unitCtrl);
+            TriggerCallActs(unitProp.propLateCallActs, unitCtrl);
 
             if (!unitCtrl.TryRestoreUpdateHandler())
                 unitCtrl.TryDeadUpdateHandler();
         }
 
-        foreach (var (createStageSetting, parentUnitCtrl) in waitDebuts)
+        foreach (var (createStageSetting, parentUnitCtrl) in lateDebuts)
         {
             Debut(createStageSetting, parentUnitCtrl);
         }
-        waitDebuts.Clear();
+        lateDebuts.Clear();
 
-        foreach (var unitCtrl in waitRestores)
+        foreach (var unitCtrl in lateRestores)
         {
             Restore(unitCtrl);
         }
-        waitRestores.Clear();
+        lateRestores.Clear();
     }
 
     static void Debut(CreateStageSetting createStageSetting, UnitCtrlBase parentUnitCtrl)
@@ -100,9 +125,10 @@ public static class GameDebut
         }
         else
         {
+            var Id = createStageSetting.Id;
             unitCtrl = ObjectPoolCtrl.Instance.GetOne(createStageSetting.coreSetting.obj);
-            GameDebut.CoreDictAdd(createStageSetting.Id, unitCtrl);
-
+            unitCtrl.Id = Id;
+            GameDebut.CoreDictAdd(Id, unitCtrl);
             GameDebut.SetNo(unitCtrl);
             poolDictByNo.Add(unitCtrl.debutNo, unitCtrl);
             poolNos.Add(unitCtrl.debutNo);
@@ -168,13 +194,13 @@ public static class GameDebut
 
         if (unitCtrl == null)
         {
-            Debug.Log($"TriggerCallAct Id not exist:{coreId}");
+            Debug.LogError($"TriggerCallAct Id not exist:{coreId}");
             return;
         }
 
         if (!unitCtrl.actCtrlDict.TryGetValue(actId, out var actCtrl))
         {
-            Debug.Log($"TriggerCallAct actCtrlDict actId not exist:{coreId},{actId}");
+            Debug.LogError($"TriggerCallAct actCtrlDict actId not exist:{coreId},{actId}");
             return;
         }
         actCtrl.Act1_RunAndReset(parentActionProp);
@@ -194,7 +220,10 @@ public static class GameDebut
         var Debuts = poolDictByNo.ToList();
         foreach (var DebutPair in Debuts)
         {
-            Restore(DebutPair.Value);
+            var unit = DebutPair.Value;
+            unit.Reset();
+            ObjectPoolCtrl.Instance.RestoreOne(unit);
+            unit.unitCtrlObj.CloseUnit();
         }
     }
 
@@ -208,7 +237,7 @@ public static class GameDebut
 
     public static void CoreDictRemove(UnitCtrlBase unitCtrl)
     {
-        coreDictById.Remove(unitCtrl.coreSetting.Id);
+        coreDictById.Remove(unitCtrl.Id);
     }
 
 

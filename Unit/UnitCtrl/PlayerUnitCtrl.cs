@@ -11,7 +11,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 
 public class PlayerUnitCtrl : UnitCtrlBase
@@ -21,7 +21,20 @@ public class PlayerUnitCtrl : UnitCtrlBase
         get => (PlayerCtrlObj)unitCtrlObj;
         set => unitCtrlObj = value;
     }
-    float playerCurrentSpeed = 0;
+    float playerCurrentSpeed;
+    bool isShift;
+    // ReplayKey replayKey;
+    List<KeyCode> playKeyCodes;
+    public uint zTime { get; set; }
+
+    public void PlayerReset()
+    {
+        playerCurrentSpeed = 0;
+        isShift = false;
+        zTime = 0;
+        // replayKey.Reset();
+        playKeyCodes.Clear();
+    }
 
 
     public void PlayerUpdateHandler()
@@ -37,22 +50,25 @@ public class PlayerUnitCtrl : UnitCtrlBase
                 PlayerReplayCtrl();
             }
         }
+        else
+        {
+            zTime = 0;
+        }
+        // unitCtrlObj.objPrintContent += $"Time:{GameReplay.keyPressTime}   POS:{unitCtrlObj.transform.position.x},{unitCtrlObj.transform.position.y}\n";
+
     }
 
-    bool isShift = false;
-    uint zTime { get; set; }
-    ReplayKey replayKey = new ReplayKey();
-    List<KeyCode> playKeyCodes = new List<KeyCode>();
+
 
     public PlayerUnitCtrl(UnitCtrlObj unitCtrlObj) : base(unitCtrlObj)
     {
+        playKeyCodes = new List<KeyCode>();
+        PlayerReset();
     }
 
     public void PlayerActionCtrl()
     {
 
-        replayKey = new ReplayKey();
-        replayKey.keyPressTime =GameReplay.keyPressTime;
         if (Input.GetKey(TransferToPlayerSetKey(KeyCode.LeftShift)) || Input.GetKey(KeyCode.Joystick1Button0))
         {
             SlowMove(true);
@@ -68,10 +84,12 @@ public class PlayerUnitCtrl : UnitCtrlBase
         }
 
 
+
         var CheckLeftRight = IsKey_LeftRight();
         if (CheckLeftRight[0])
         {
             MoveLeft();
+
         }
         else if (CheckLeftRight[1])
         {
@@ -82,24 +100,30 @@ public class PlayerUnitCtrl : UnitCtrlBase
         if (CheckUpDown[1])
         {
             MoveDown();
+
         }
         else if (CheckUpDown[0])
         {
             MoveUp();
         }
-        if (replayKey.pressKeyCodes.Count > 0)
-            GameReplay.InputSaveData.replayKeys.Add(replayKey);
+
+        if (Input.GetKey(KeyCode.P))
+        {
+            unitCtrlObj.FileWriteContent();
+        }
     }
 
     public void PlayerReplayCtrl()
     {
-        if (GameReplay.playKeys.Where(r => r.keyPressTime ==GameReplay.keyPressTime).Count() > 1)
+        if (Input.GetKey(KeyCode.P))
         {
-            Debug.LogError($"KeyPressTime:{GameReplay.keyPressTime}  Repeat");
+            unitCtrlObj.FileWriteContent();
         }
 
+        if (!GameReplay.CheckPlayKeyExist())
+            return;
 
-        playKeyCodes = GameReplay.playKeys.FirstOrDefault(r => r.keyPressTime ==GameReplay.keyPressTime).pressKeyCodes;
+        playKeyCodes = GameReplay.GetNowPlayKeyCodes();
         if (playKeyCodes.Contains(KeyCode.LeftShift))
         {
             SlowMove(true);
@@ -118,6 +142,7 @@ public class PlayerUnitCtrl : UnitCtrlBase
         if (playKeyCodes.Contains(KeyCode.LeftArrow))
         {
             MoveLeft();
+
         }
         else if (playKeyCodes.Contains(KeyCode.RightArrow))
         {
@@ -139,7 +164,9 @@ public class PlayerUnitCtrl : UnitCtrlBase
     {
         if (slow)
         {
-            replayKey.pressKeyCodes.Add(KeyCode.LeftShift);
+            // unitCtrlObj.objPrintContent += $"Time:{GameReplay.keyPressTime}   Shift\n";
+            GameReplay.InputSaveData.AddReplayKey(GameReplay.keyPressTime, KeyCode.LeftShift);
+
             playerCurrentSpeed = GameConfig.PLAYER_MOVE_SPEED * GameConfig.PLAYER_SLOW_SPEED_RATE;
             isShift = true;
             playerCtrlObj.core.SetActive(true);
@@ -154,29 +181,34 @@ public class PlayerUnitCtrl : UnitCtrlBase
 
     void Shot()
     {
+        GameReplay.InputSaveData.AddReplayKey(GameReplay.keyPressTime, KeyCode.Z);
+
         if (GameMainCtrl.Instance.nowGameProgressState == GameProgressState.Dialog)
             return;
-        replayKey.pressKeyCodes.Add(KeyCode.Z);
+
         zTime++;
         foreach (var playerShotCreateStageSetting in GameSelect.playerData.playerShotCreateStageSettings)
         {
 
             if (
                  zTime % playerShotCreateStageSetting.coreSetting.playerShotHzTime == playerShotCreateStageSetting.coreSetting.playerShotDelayTime &&
-                isShift == playerShotCreateStageSetting.coreSetting.playerShift.Value &&
+                isShift == playerShotCreateStageSetting.coreSetting.playerShift &&
                 GamePlayer.power >= playerShotCreateStageSetting.coreSetting.playerPowerNeed &&
                 GamePlayer.power < playerShotCreateStageSetting.coreSetting.playerPowerNeed + 1f
-            
+
             )
             {
-                unitProp.propWaitDebutByCreateSettings.Add(playerShotCreateStageSetting);
+                // unitCtrlObj.objPrintContent += $"Time:{GameReplay.keyPressTime}   Shot\n";
+                unitProp.propLateDebutByCreateSettings.Add(playerShotCreateStageSetting);
             }
         }
     }
 
     void MoveLeft()
     {
-        replayKey.pressKeyCodes.Add(KeyCode.LeftArrow);
+        // unitCtrlObj.objPrintContent += $"Time:{GameReplay.keyPressTime}   ←\n";
+
+        GameReplay.InputSaveData.AddReplayKey(GameReplay.keyPressTime, KeyCode.LeftArrow);
         if (unitCtrlObj.transform.position.x > GameConfig.PLAYER_MOVE_BORDER_LEFT)
         {
             unitCtrlObj.transform.Translate(new Vector2(-playerCurrentSpeed, 0));
@@ -185,7 +217,8 @@ public class PlayerUnitCtrl : UnitCtrlBase
 
     void MoveRight()
     {
-        replayKey.pressKeyCodes.Add(KeyCode.RightArrow);
+        // unitCtrlObj.objPrintContent += $"Time:{GameReplay.keyPressTime}   →\n";
+        GameReplay.InputSaveData.AddReplayKey(GameReplay.keyPressTime, KeyCode.RightArrow);
         if (unitCtrlObj.transform.position.x < GameConfig.PLAYER_MOVE_BORDER_RIGHT)
         {
             unitCtrlObj.transform.Translate(new Vector2(playerCurrentSpeed, 0));
@@ -193,7 +226,8 @@ public class PlayerUnitCtrl : UnitCtrlBase
     }
     void MoveUp()
     {
-        replayKey.pressKeyCodes.Add(KeyCode.UpArrow);
+        // unitCtrlObj.objPrintContent += $"Time:{GameReplay.keyPressTime}   ↑\n";
+        GameReplay.InputSaveData.AddReplayKey(GameReplay.keyPressTime, KeyCode.UpArrow);
         if (unitCtrlObj.transform.position.y < GameConfig.PLAYER_MOVE_BORDER_TOP)
         {
             unitCtrlObj.transform.Translate(new Vector2(0, playerCurrentSpeed));
@@ -202,7 +236,8 @@ public class PlayerUnitCtrl : UnitCtrlBase
 
     void MoveDown()
     {
-        replayKey.pressKeyCodes.Add(KeyCode.DownArrow);
+        // unitCtrlObj.objPrintContent += $"Time:{GameReplay.keyPressTime}   ↓\n";
+        GameReplay.InputSaveData.AddReplayKey(GameReplay.keyPressTime, KeyCode.DownArrow);
         if (unitCtrlObj.transform.position.y > GameConfig.PLAYER_MOVE_BORDER_BOTTOM)
         {
             unitCtrlObj.transform.Translate(new Vector2(0, -playerCurrentSpeed));
@@ -212,21 +247,8 @@ public class PlayerUnitCtrl : UnitCtrlBase
 
     public void HandlePlayerHpEmpty()
     {
-        if (GameReplay.isReplayMode)
-        {
-            GamePlayer.SetDef();
-        }
-        else
-        {
-            GameMainCtrl.Instance.Pause();
-            if (GameSelect.isPracticeMode)
-            {
-                PracticeOverSelect.Instance.Show();
-            }
-            else
-            {
-                GameOverSelect.Instance.Show();
-            }
-        }
+        // unitCtrlObj.objPrintContent += $"Time:{GameReplay.keyPressTime}   HP0\n";
+        GameMainCtrl.Instance.gameSceneUpdateFlag |= GameMainCtrl.UpdateFlag.LatePlayerHpEmptyPause;
+        unitCtrlObj.FileWriteContent();
     }
 }

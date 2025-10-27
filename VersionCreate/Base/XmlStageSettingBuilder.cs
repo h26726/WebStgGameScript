@@ -8,7 +8,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System.Linq;
 using System.IO;
 using System.Xml;
@@ -26,18 +26,18 @@ public static class XmlStageSettingBuilder
 
         public string[] ParamVals = new string[0];
     }
-    public static List<XmlStageSetting> BuildByReadFileName(string name)
+    public static List<XmlStageSetting> BuildByReadFileName(string version, string name)
     {
         var xmlStageSettings = new List<XmlStageSetting>();
-        ReadAndMergeXmlSettings(name, ref xmlStageSettings);
+        ReadAndMergeXmlSettings(version, name, ref xmlStageSettings);
         return xmlStageSettings;
     }
 
-    public static List<XmlStageSetting> BuildByReadDirPath(string path)
+    public static List<XmlStageSetting> BuildByReadDirPath(string version, string path)
     {
         var xmlStageSettings = new List<XmlStageSetting>();
 
-        TextAsset[] xmlFiles = Resources.LoadAll<TextAsset>($"Setting/{path}");
+        TextAsset[] xmlFiles = Resources.LoadAll<TextAsset>($"Setting/{version}/{path}");
         if (xmlFiles == null || xmlFiles.Length == 0)
         {
             // Debug.LogError($"找不到任何 XML 檔案在：Resources/Setting/{path}");
@@ -49,14 +49,14 @@ public static class XmlStageSettingBuilder
             string fileName = xmlFile.name;
             Debug.Log($"fileName xml: {fileName}");
 
-            ReadAndMergeXmlSettings(path + "/" + fileName, ref xmlStageSettings);
+            ReadAndMergeXmlSettings(version, path + "/" + fileName, ref xmlStageSettings);
         }
         return xmlStageSettings;
     }
 
-    public static void ReadAndMergeXmlSettings(string name, ref List<XmlStageSetting> xmlStageSettings)
+    public static void ReadAndMergeXmlSettings(string version, string name, ref List<XmlStageSetting> xmlStageSettings)
     {
-        TextAsset xmlAsset = Resources.Load<TextAsset>($"Setting/{name}");
+        TextAsset xmlAsset = Resources.Load<TextAsset>($"Setting/{version}/{name}");
 
         if (xmlAsset != null)
         {
@@ -82,7 +82,7 @@ public static class XmlStageSettingBuilder
         }
         else
         {
-            Debug.LogError($"找不到 XML 檔案：Setting/{name}");
+            Debug.LogError($"找不到 XML 檔案：Setting/{version}/{name}");
         }
     }
 

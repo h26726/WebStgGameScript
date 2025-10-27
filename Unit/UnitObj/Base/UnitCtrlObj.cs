@@ -4,34 +4,39 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine.UI;
+using System.Runtime.CompilerServices;
 
 public abstract class UnitCtrlObj : MonoBehaviour
 {
-    public static float objLast_zIndex { get; set; }
-    public Dictionary<uint, Vector2> objRecordPosDict = new Dictionary<uint, Vector2>();
-    public Dictionary<uint, float> objRecordAngleDict = new Dictionary<uint, float>();
-    public Dictionary<uint, float> objActionMoveAngleDict = new Dictionary<uint, float>();
+    public Dictionary<uint, Vector2> objRecordPosDict;
+    public Dictionary<uint, float> objRecordAngleDict;
+    public Dictionary<uint, float> objActionMoveAngleDict;
     float obj_zIndex { get; set; }
-    string obj_zCode { get; set; }
-    public Vector2 beforeTransformPos { get; set; }
+    int obj_zCodeHash { get; set; }
     public uint coreSettingId { get; set; }
+    public Vector2 beforeTransformPos { get; set; }
+    public string objPrintContent;
 
 
     public UnitCtrlObj parent { get; set; }
     public Animator animator { get; set; }
     public Transform mainObjTransform { get; set; }
+    public CollisionCtrlBase collisionCtrl { get; set; }
     public Transform childFrameTransform { get; set; }
     public SpriteRenderer spriteRenderer { get; set; }
 
-    public Text actionTimeText;
-    string objPrintContent = "";
+    public Text actionTimeText { get; set; }
 
+    List<Pos> tmpPoses1;
+    List<Pos> tmpPoses2;
+    List<AngleSet> tmpAngles;
+    private Vector3 tmpPos; // class 層級共用
 
     void Awake()
     {
@@ -43,13 +48,46 @@ public abstract class UnitCtrlObj : MonoBehaviour
 
         spriteRenderer = transform.GetChild(0).transform.GetChild(0).GetComponent<SpriteRenderer>();
         mainObjTransform = transform.GetChild(0).transform;
+        collisionCtrl = transform.GetChild(0).GetComponent<CollisionCtrlBase>();
         childFrameTransform = transform.GetChild(1).transform;
         animator = GetComponent<Animator>();
         actionTimeText = GetComponent<Text>();
+
+        objRecordPosDict = new Dictionary<uint, Vector2>();
+        objRecordAngleDict = new Dictionary<uint, float>();
+        objActionMoveAngleDict = new Dictionary<uint, float>();
+        tmpPoses1 = new List<Pos>() { null };
+        tmpPoses2 = new List<Pos>() { null }; ;
+        tmpAngles = new List<AngleSet>();
         if (this is PlayerCtrlObj)
         {
             var playerCtrlObj = this as PlayerCtrlObj;
             playerCtrlObj.PlayerAwake();
+
+        }
+    }
+
+    public void Reset()
+    {
+        if (animator != null)
+            animator.Play("Idle");
+
+        obj_zIndex = 0;
+        obj_zCodeHash = 0;
+        coreSettingId = 0;
+        beforeTransformPos = Vector2.zero;
+        objPrintContent = "";
+        parent = null;
+        objRecordPosDict.Clear();
+        objRecordAngleDict.Clear();
+        objActionMoveAngleDict.Clear();
+        tmpPoses1[0] = null;
+        tmpPoses2[0] = null;
+        tmpAngles.Clear();
+        if (this is PlayerCtrlObj)
+        {
+            var playerCtrlObj = this as PlayerCtrlObj;
+            playerCtrlObj.PlayerCtrlObjReset();
         }
     }
 
@@ -77,23 +115,12 @@ public abstract class UnitCtrlObj : MonoBehaviour
     }
 
 
-    public void Reset()
-    {
-        if (animator != null)
-            animator.Play("Idle");
 
-        objRecordPosDict.Clear();
-        objRecordAngleDict.Clear();
-        objActionMoveAngleDict.Clear();
-        obj_zIndex = 0;
-        obj_zCode = null;
-
-    }
 
     public void EnableUnit()
     {
         gameObject.SetActive(true);
-        transform.SetAsLastSibling();
+        // transform.SetAsLastSibling();
     }
 
     public void CloseUnit()
@@ -103,16 +130,14 @@ public abstract class UnitCtrlObj : MonoBehaviour
         SetChildRotateZ(0);
         transform.position = new Vector3(GameConfig.POOL_RESET_POS.x, GameConfig.POOL_RESET_POS.y, obj_zIndex);
         gameObject.SetActive(false);
-        transform.SetAsFirstSibling();
+        // transform.SetAsFirstSibling();
     }
 
 
     public void Set_zIndex_zCode(uint coreSettingId)
     {
-        this.obj_zIndex = objLast_zIndex;
-        objLast_zIndex -= GameConfig.Z_INDEX_REDUCE;
-
-        this.obj_zCode = coreSettingId.ToString() + "_z" + obj_zIndex * 1000f;
+        this.obj_zIndex = GameMainCtrl.Instance.Get_zIndex();
+        this.obj_zCodeHash = (int)(coreSettingId * 1000000 + (int)(obj_zIndex * 1000));
         this.coreSettingId = coreSettingId;
     }
 
@@ -127,7 +152,7 @@ public abstract class UnitCtrlObj : MonoBehaviour
         if (!Mathf.Approximately(birthDurTime, 0f))
             PlayBirthAni(birthAniStart);
 
-        if (stageSetting.rotateIsMoveAngle == true && stageSetting.moveAngle != null)
+        if (stageSetting.rotateIsMoveAngle == BoolState.True && stageSetting.moveAngle != null)
         {
             SetRotateZ(stageSetting.moveAngle);
         }
@@ -168,18 +193,7 @@ public abstract class UnitCtrlObj : MonoBehaviour
 
     public void ChangeSprite(string spriteName)
     {
-        var spritePoolObj = LoadCtrl.Instance.pool.spritePoolList.FirstOrDefault(r => r.name == spriteName);
-        if (spritePoolObj != null && spritePoolObj.sprite != null)
-        {
-            spriteRenderer.sprite = spritePoolObj.sprite;
-        }
-        else
-        {
-            Debug.LogError($"spriteName '{spriteName}' not found .");
-        }
-
-
-
+        spriteRenderer.sprite = ObjectPoolCtrl.Instance.spriteDict[spriteName];
     }
 
     public void LeaveRelatParent()
@@ -187,88 +201,166 @@ public abstract class UnitCtrlObj : MonoBehaviour
         transform.SetParent(LoadCtrl.Instance.pool.transform);
         transform.rotation = Quaternion.Euler(0f, 0f, 0f);
     }
-    public void BackPoolPos()
-    {
-        LeaveRelatParent();
-        if (animator != null)
-            animator.Play("Idle");
-        gameObject.SetActive(false);
-        transform.SetAsFirstSibling();
-        transform.position = new Vector3(GameConfig.POOL_RESET_POS.x, GameConfig.POOL_RESET_POS.y, obj_zIndex);
-    }
+    //原版本 保留
+    // public float GetRotateZ()
+    // {
+    //     if (mainObjTransform == null)
+    //         return 0;
+    //     return mainObjTransform.rotation.eulerAngles.z;
+    // }
+    // public float GetChildRotateZ()
+    // {
+    //     if (childFrameTransform == null)
+    //         return 0;
+    //     return childFrameTransform.rotation.eulerAngles.z;
+    // }
+
+    // public void SetRotateZ(float RotateZ)
+    // {
+    //     if (mainObjTransform == null)
+    //         return;
+    //     mainObjTransform.rotation = Quaternion.Euler(0f, 0f, RotateZ);
+    // }
+
+    // public void SetRotateZ(List<AngleSet> angleSets)
+    // {
+    //     var angle = GetAngle(angleSets, out var isNewAngle);
+    //     if (isNewAngle) SetRotateZ(angle);
+    //     else SetRotateZ(angle);
+    // }
+
+    // public void SetAddRotateZ(List<AngleSet> angleSets)
+    // {
+    //     var angle = GetAngle(angleSets, out var isNewAngle);
+    //     if (isNewAngle) SetRotateZ(angle);
+    //     else SetRotateZ(GetRotateZ() + angle / 60);
+    // }
 
 
+    // public void SetChildRotateZ(float ChildRotateZ)
+    // {
+    //     if (childFrameTransform == null)
+    //         return;
+    //     childFrameTransform.rotation = Quaternion.Euler(0f, 0f, ChildRotateZ);
+    // }
+
+    // public void SetChildRotateZ(List<AngleSet> angleSets)
+    // {
+    //     var angle = GetAngle(angleSets, out var isNewAngle);
+    //     if (isNewAngle) SetChildRotateZ(angle);
+    //     else SetChildRotateZ(angle);
+    // }
+
+    // public void SetChildAddRotateZ(List<AngleSet> angleSets)
+    // {
+    //     var angle = GetAngle(angleSets, out var isNewAngle);
+    //     if (isNewAngle) SetChildRotateZ(angle);
+    //     else SetChildRotateZ(GetChildRotateZ() + angle / 60);
+    // }
+
+
+
+    private const float INV_60 = 1f / 60f;
+    private static readonly Vector3 ForwardAxis = Vector3.forward;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float GetRotateZ()
     {
-        if (mainObjTransform == null)
-            return 0;
-        return mainObjTransform.rotation.eulerAngles.z;
+        return mainObjTransform != null ? mainObjTransform.rotation.eulerAngles.z : 0f;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float GetChildRotateZ()
     {
-        if (childFrameTransform == null)
-            return 0;
-        return childFrameTransform.rotation.eulerAngles.z;
+        return childFrameTransform != null ? childFrameTransform.rotation.eulerAngles.z : 0f;
     }
 
-    public void SetRotateZ(float RotateZ)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void SetRotateZ(float rotateZ)
     {
-        if (mainObjTransform == null)
-            return;
-        mainObjTransform.rotation = Quaternion.Euler(0f, 0f, RotateZ);
+        if (mainObjTransform == null) return;
+        mainObjTransform.rotation = Quaternion.AngleAxis(rotateZ, ForwardAxis);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetRotateZ(List<AngleSet> angleSets)
     {
-        var angle = GetAngle(angleSets, out var isNewAngle);
-        if (isNewAngle) SetRotateZ(angle);
-        else SetRotateZ(angle);
+        float angle = GetAngle(angleSets, out bool _);
+        SetRotateZ(angle);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetAddRotateZ(List<AngleSet> angleSets)
     {
-        var angle = GetAngle(angleSets, out var isNewAngle);
-        if (isNewAngle) SetRotateZ(angle);
-        else SetRotateZ(GetRotateZ() + angle / 60);
+        float angle = GetAngle(angleSets, out bool isNewAngle);
+        if (mainObjTransform == null) return;
+
+        if (isNewAngle)
+        {
+            SetRotateZ(angle);
+        }
+        else
+        {
+            // 快取 currentZ，避免重取 rotation.eulerAngles
+            float currentZ = mainObjTransform.rotation.eulerAngles.z;
+            SetRotateZ(currentZ + angle * INV_60);
+        }
     }
 
-
-    public void SetChildRotateZ(float ChildRotateZ)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void SetChildRotateZ(float childRotateZ)
     {
-        if (childFrameTransform == null)
-            return;
-        childFrameTransform.rotation = Quaternion.Euler(0f, 0f, ChildRotateZ);
+        if (childFrameTransform == null) return;
+        childFrameTransform.rotation = Quaternion.AngleAxis(childRotateZ, ForwardAxis);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetChildRotateZ(List<AngleSet> angleSets)
     {
-        var angle = GetAngle(angleSets, out var isNewAngle);
-        if (isNewAngle) SetChildRotateZ(angle);
-        else SetChildRotateZ(angle);
+        float angle = GetAngle(angleSets, out bool _);
+        SetChildRotateZ(angle);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetChildAddRotateZ(List<AngleSet> angleSets)
     {
-        var angle = GetAngle(angleSets, out var isNewAngle);
-        if (isNewAngle) SetChildRotateZ(angle);
-        else SetChildRotateZ(GetChildRotateZ() + angle / 60);
+        float angle = GetAngle(angleSets, out bool isNewAngle);
+        if (childFrameTransform == null) return;
+
+        if (isNewAngle)
+        {
+            SetChildRotateZ(angle);
+        }
+        else
+        {
+            // 快取 currentZ，避免重取 rotation.eulerAngles
+            float currentZ = childFrameTransform.rotation.eulerAngles.z;
+            SetChildRotateZ(currentZ + angle * INV_60);
+        }
     }
 
-    public bool IsOutBorder(float restoreDistance, Vector2? Pos = null)
+    // 這是外部既有函式，不動它
+
+
+
+    public bool IsOutBorder(float restoreDistance, Vector2 Pos)
     {
-        if (Pos == null)
-        {
-            Pos = transform.position;
-        }
         return IsOutBorderDis(Pos, restoreDistance);
     }
 
-    public static bool IsOutBorderDis(Vector2? Pos, float dis)
+    public bool IsOutBorder(float restoreDistance)
     {
-        if (Pos.Value.x < GameConfig.BORDER_LEFT - dis) return true;
-        else if (Pos.Value.x > GameConfig.BORDER_RIGHT + dis) return true;
-        else if (Pos.Value.y < GameConfig.BD_BOTTOM - dis) return true;
-        else if (Pos.Value.y > GameConfig.BD_TOP + dis) return true;
+        return IsOutBorderDis(transform.position, restoreDistance);
+    }
+
+    public static bool IsOutBorderDis(Vector2 pos, float dis)
+    {
+        if (InvalidHelper.IsInvalid(pos))
+            return true; // 或 false，看邏輯需求
+        if (pos.x < GameConfig.BORDER_LEFT - dis) return true;
+        if (pos.x > GameConfig.BORDER_RIGHT + dis) return true;
+        if (pos.y < GameConfig.BD_BOTTOM - dis) return true;
+        if (pos.y > GameConfig.BD_TOP + dis) return true;
         return false;
     }
 
@@ -277,12 +369,18 @@ public abstract class UnitCtrlObj : MonoBehaviour
 
     public void MovePos(Vector2 pos)
     {
-        transform.position = new Vector3(pos.x, pos.y, obj_zIndex);
+        tmpPos.x = pos.x;
+        tmpPos.y = pos.y;
+        tmpPos.z = obj_zIndex;
+        transform.position = tmpPos;
     }
 
     public void MoveTranslate(Vector2 moveVector)
     {
-        transform.Translate(moveVector);
+        tmpPos.x = moveVector.x;
+        tmpPos.y = moveVector.y;
+        tmpPos.z = 0f;
+        transform.Translate(tmpPos);
     }
 
 
@@ -292,22 +390,22 @@ public abstract class UnitCtrlObj : MonoBehaviour
 
     public void TryObjAddRecord(SettingBase setting)
     {
-        if (setting.recordAngle != null && setting.recordAngleId != null)
-        {
-            objRecordAngleDict.Add(setting.recordAngleId.Value, GetAngle(setting.recordAngle, out _));
-        }
-        if (setting.recordPos != null && setting.recordPosId != null)
-        {
-            objRecordPosDict.Add(setting.recordPosId.Value, GetPos(setting.recordPos));
-        }
-    }
+        var recordAngleId = setting.recordAngleId;
+        var recordPosId = setting.recordPosId;
 
+        if (!InvalidHelper.IsInvalid(recordAngleId) && setting.recordAngle != null)
+            objRecordAngleDict[recordAngleId] = GetAngle(setting.recordAngle, out _);
+
+        if (!InvalidHelper.IsInvalid(recordPosId) && setting.recordPos != null)
+            objRecordPosDict[recordPosId] = GetPos(setting.recordPos);
+    }
     public void InsertRelatChild(UnitCtrlObj insertUnitCtrlObj)
     {
         if (childFrameTransform != null)
         {
-            insertUnitCtrlObj.transform.SetParent(childFrameTransform);
-            insertUnitCtrlObj.transform.SetAsLastSibling();
+            var insertTransform = insertUnitCtrlObj.transform;
+            insertTransform.SetParent(childFrameTransform);
+            insertTransform.SetAsLastSibling();
             insertUnitCtrlObj.SetRotateZ(0);
         }
         else
@@ -316,38 +414,34 @@ public abstract class UnitCtrlObj : MonoBehaviour
         }
     }
 
-
-    public Vector2 GetPos(List<Pos> pos)
+    public Vector2 GetPos(List<Pos> posList)
     {
-        Vector2 Pos = GameConfig.CENTER;
-        foreach (var posData in pos)
+        Vector2 pos = GameConfig.CENTER;
+
+        for (int i = 0; i < posList.Count; i++)
         {
-            if (posData.Id != null)
+            var posData = posList[i];
+
+            if (!InvalidHelper.IsInvalid(posData.Id))
             {
-                var id = posData.Id.Value;
-                var idVal = (IdVal)id;
-                if (idVal == IdVal.XCenter)
-                {
-                    Pos = new Vector2(GameConfig.CENTER.x, Pos.y);
-                }
-                else if (idVal == IdVal.YCenter)
-                {
-                    Pos = new Vector2(Pos.x, GameConfig.CENTER.y);
-                }
-                else
-                {
-                    Pos = GetPos(id);
-                }
+                var idVal = (IdVal)posData.Id;
+                if (idVal == IdVal.XCenter) pos.x = GameConfig.CENTER.x;
+                else if (idVal == IdVal.YCenter) pos.y = GameConfig.CENTER.y;
+                else pos = GetPos(posData.Id);
             }
-            else if (posData.point != null) Pos += posData.point.Value;
-            else if (posData.ADangle != null && posData.ADdistance != null)
+            else if (!InvalidHelper.IsInvalid(posData.point))
             {
-                var adAngle = GetAngle(posData.ADangle, out _);
-                var adDis = posData.ADdistance.Value;
-                Pos += CalPos(adAngle, adDis);
+                pos += posData.point;
+            }
+            else if (posData.ADangle != null && !InvalidHelper.IsInvalid(posData.ADdistance))
+            {
+                float angle = GetAngle(posData.ADangle, out _);
+                float dis = posData.ADdistance;
+                pos += CalPos(angle, dis);
             }
         }
-        return Pos;
+
+        return pos;
     }
 
     public Vector2 GetPos(uint id)
@@ -371,24 +465,26 @@ public abstract class UnitCtrlObj : MonoBehaviour
     {
         float Angle = 0;
         isNewAngle = true;
-        foreach (var angleData in angle)
+        for (int i = 0, c = angle.Count; i < c; i++)
         {
-
-            if (angleData.angle != null)
+            var angleData = angle[i];
+            if (!InvalidHelper.IsInvalid(angleData.angle))
             {
-                Angle += angleData.angle.Value;
+                Angle += angleData.angle;
                 isNewAngle = false;
             }
             else if (angleData.pos1 != null && angleData.pos2 != null)
             {
+                tmpPoses1[0] = angleData.pos1;
+                tmpPoses2[0] = angleData.pos2;
                 Angle += CalAngle(
-                    GetPos(new List<Pos>() { angleData.pos1 }),
-                    GetPos(new List<Pos>() { angleData.pos2 })
+                    GetPos(tmpPoses1),
+                    GetPos(tmpPoses2)
                 );
             }
-            else if (angleData.IdRotateZ != null)
+            else if (!InvalidHelper.IsInvalid(angleData.IdRotateZ))
             {
-                var unitCtrlObj = GetUnitObj(angleData.IdRotateZ.Value);
+                var unitCtrlObj = GetUnitObj(angleData.IdRotateZ);
                 if (unitCtrlObj != null)
                 {
                     Angle += unitCtrlObj.GetRotateZ();
@@ -413,9 +509,9 @@ public abstract class UnitCtrlObj : MonoBehaviour
                     GetPos(angleData.Ids[1])
                 );
             }
-            else if (angleData.recordId != null && angleData.recordId > RECORD_TMP_ID_MIN)
+            else if (!InvalidHelper.IsInvalid(angleData.recordId) && angleData.recordId > RECORD_TMP_ID_MIN)
             {
-                Angle += objRecordAngleDict[angleData.recordId.Value];
+                Angle += objRecordAngleDict[angleData.recordId];
             }
         }
         return Angle;
@@ -461,12 +557,7 @@ public abstract class UnitCtrlObj : MonoBehaviour
 
     public bool TryGetActionMoveAngle(uint coreId, out float angle)
     {
-        angle = 0f;
-        if (!objActionMoveAngleDict.ContainsKey(coreId))
-            return false;
-
-        angle = objActionMoveAngleDict[coreId];
-        return true;
+        return objActionMoveAngleDict.TryGetValue(coreId, out angle);
     }
 
     public void PrintCreate()
@@ -486,18 +577,29 @@ public abstract class UnitCtrlObj : MonoBehaviour
     }
     public string FileWriteContent()
     {
-        File.WriteAllText(LoadCtrl.Instance.unitLogPath + obj_zCode + ".txt", objPrintContent);
+        File.WriteAllText(LoadCtrl.Instance.unitLogPath + obj_zCodeHash + ".txt", objPrintContent);
         return objPrintContent;
     }
 
+
     void ReceiveParentRecord(UnitCtrlObj parentUnitObj)
     {
-        if (parentUnitObj != null)
+        if (parentUnitObj == null)
+            return;
+
+        if (parentUnitObj.objRecordAngleDict.Count > 0)
         {
-            if (parentUnitObj.objRecordAngleDict.Count > 0)
-                objRecordAngleDict = new Dictionary<uint, float>(parentUnitObj.objRecordAngleDict);
-            if (parentUnitObj.objRecordPosDict.Count > 0)
-                objRecordPosDict = new Dictionary<uint, Vector2>(parentUnitObj.objRecordPosDict);
+            objRecordAngleDict.Clear();
+
+            foreach (var kv in parentUnitObj.objRecordAngleDict)
+                objRecordAngleDict[kv.Key] = kv.Value;
+        }
+
+        if (parentUnitObj.objRecordPosDict.Count > 0)
+        {
+            objRecordPosDict.Clear();
+            foreach (var kv in parentUnitObj.objRecordPosDict)
+                objRecordPosDict[kv.Key] = kv.Value;
         }
     }
 

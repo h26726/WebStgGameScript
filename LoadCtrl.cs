@@ -8,36 +8,37 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System.Linq;
 using System.IO;
 
 public partial class LoadCtrl : SingletonBase<LoadCtrl>
 {
-    public List<VersionData> versionDatas = new List<VersionData>();
-    public VersionData selectVersionData;
+    public List<VersionData> versionDatas { get; set; } = new List<VersionData>();
+    public VersionData selectVersionData { get; set; }
+    public GameSceneState gameState { get; set; } = GameSceneState.Stop;
     public string unitLogPath { get; set; }
-
 
     public ObjectPoolCtrl pool;
     public AudioSource audioSource;
-
     public Camera gameCamera;
-
     public Camera titleCamera;
-
-
     public Animator animator;
-
-
-
-    public GameSceneState gameState = GameSceneState.Stop;
+    [SerializeField] List<GameObject> _selectList;
     public List<ISelectBaseUpdater> selectList = new List<ISelectBaseUpdater>();
 
     void Start()
     {
         Debug.Log(nameof(Start));
         unitLogPath = Application.persistentDataPath + "/unitLog/";
+
+        foreach (var selectObj in _selectList)
+        {
+            var select = selectObj.GetComponent<ISelectBaseUpdater>();
+            selectList.Add(select);
+            select.Init();
+        }
+
         CreateUnitLogDirectory();
         ClearUnitLogDirectoryFile();
         ScreenSetup();
@@ -49,24 +50,37 @@ public partial class LoadCtrl : SingletonBase<LoadCtrl>
         GameSelect.DefaultSelectDifficultStageByConfigParam();
 
         //keyBoardSave
-        keyBoardSaveDatas = PlayerSaveData.LoadKeyBoardSaveDatas();
+        keyBoardSaveDatas = SaveJsonData.LoadKeyBoardSaveDatas();
         KeyBoardSelect.Instance.UseKeyBoardSaveDatas();
 
         //configSave
-        configSaveDatas = PlayerSaveData.LoadConfigSaveData();
+        configSaveDatas = SaveJsonData.LoadConfigSaveData();
         OptionSelect.Instance.UseConfigSaveDatas();
         ChangeVolumeByConfigSave();
         ChangleScreenByConfigSave();
 
         //replaySaveDatas
-        replaySaveDatas = PlayerSaveData.LoadReplaySaveDatas();
+        replaySaveDatas = SaveJsonData.LoadReplaySaveDatas();
         ReplaySelect.Instance.UseReplaySaveDatas();
 
         //selectVersionData
-        selectVersionData = new VersionData(GameConfig.VERSION, VersionGetType.InsideCreateByXml);
-        InsideOverwriteVersionData();
+        versionDatas = new List<VersionData>();
+        foreach (var version in GameConfig.VERSIONS)
+        {
+            var versionData = new VersionData(version);
+            versionDatas.Add(versionData);
+        }
+        selectVersionData = versionDatas.First(r => r.version == GameConfig.VERSION);
         PracticeSelect.Instance.UseVersionData();
 
+        GameDebut.Init();
+        GameMainCtrl.Instance.Reset();
+        GameObjCtrl.Instance.Reset();
+        GameProgressStageCtrl.Reset();
+        GameReplay.Init();
+        GameSelect.Init();
+        GameBoss.Reset();
+        GamePlayer.Reset();
         StartCoroutine(CoroutineRun());
     }
 
@@ -76,6 +90,31 @@ public partial class LoadCtrl : SingletonBase<LoadCtrl>
         yield return StartCoroutine(TryPlayLoadingShowAni());
         yield return StartCoroutine(pool.Init());
         yield return SwitchTitlePageCoroutine();
+    }
+
+    void ClearGameScene()
+    {
+        Debug.Log(nameof(ClearGameScene));
+        if (gameState == GameSceneState.Run)
+        {
+            gameState = GameSceneState.Stop;
+            GameDebut.ClearAll();
+            GameDebut.Reset();
+            GameMainCtrl.Instance.Reset();
+            GameObjCtrl.Instance.Reset();
+            GameProgressStageCtrl.Reset();
+            GameReplay.ResetInput();
+            GameBoss.Reset();
+            GamePlayer.Reset();
+
+
+            if (DialogCtrl.nowInstance != null)
+            {
+                DialogCtrl.nowInstance.Reset();
+                DialogCtrl.nowInstance.Close();
+            }
+            ObjectPoolCtrl.Instance.LogNum();
+        }
     }
 
     void Update()
@@ -152,14 +191,26 @@ public partial class LoadCtrl : SingletonBase<LoadCtrl>
     {
         Debug.Log(nameof(SwitchPage));
         audioSource.Stop();
+        if (gameState == GameSceneState.Run)
+        {
+            ClearGameScene();
+        }
+
         if (Index == PageIndex.Game)
         {
             StartCoroutine(SwitchGamePageCoroutine());
         }
         else
         {
+            ResetSelectContent();
             StartCoroutine(SwitchTitlePageCoroutine());
         }
+    }
+
+    void ResetSelectContent()
+    {
+        GameSelect.Reset();
+        GameReplay.ResetRead();
     }
 
     IEnumerator SwitchGamePageCoroutine()
@@ -170,7 +221,7 @@ public partial class LoadCtrl : SingletonBase<LoadCtrl>
         yield return StartCoroutine(WaitLoadingAnimCoroutine());
         SwitchGameCamera();
         GameSelect.InitPlayerAndGameCtrlDatas();
-        GameMainCtrl.Instance.Init();
+        GameMainCtrl.Instance.GameStartSet();
         yield return new WaitForSecondsRealtime(1f);
         animator.Play("Hide");
         yield return StartCoroutine(WaitLoadingAnimCoroutine());
@@ -182,22 +233,14 @@ public partial class LoadCtrl : SingletonBase<LoadCtrl>
         Debug.Log(nameof(SwitchTitlePageCoroutine));
         GameMainCtrl.Instance.UnPause();
         yield return StartCoroutine(TryPlayLoadingShowAni());
+        System.GC.Collect();
         SwitchTitleCamera();
-        TryLeaveAndClearGameScene();
         yield return StartCoroutine(PlayLoadingHideAni());
         TitleSelect.Instance.Show();
         LoadCtrl.Instance.pool.PlayBgm("Title");
     }
 
-    void TryLeaveAndClearGameScene()
-    {
-        Debug.Log(nameof(TryLeaveAndClearGameScene));
-        if (gameState == GameSceneState.Run)
-        {
-            gameState = GameSceneState.Stop;
-            GameDebut.ClearAll();
-        }
-    }
+
 
     IEnumerator TryPlayLoadingShowAni()
     {
@@ -247,35 +290,23 @@ public partial class LoadCtrl : SingletonBase<LoadCtrl>
     public void ChangeVolumeByConfigSave()
     {
         Debug.Log(nameof(ChangeVolumeByConfigSave));
-        audioSource.volume = PlayerSaveData.configSaveDatas.BGMVolume / 100f;
+        audioSource.volume = SaveJsonData.configSaveDatas.BGMVolume / 100f;
 
     }
 
     void ChangleScreenByConfigSave()
     {
         Debug.Log(nameof(ChangleScreenByConfigSave));
-        if (PlayerSaveData.configSaveDatas.screenModeType == ScreenMode.FullScreen)
+        if (SaveJsonData.configSaveDatas.screenModeType == ScreenMode.FullScreen)
         {
             Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
         }
-        else if (PlayerSaveData.configSaveDatas.screenModeType == ScreenMode.Windowed)
+        else if (SaveJsonData.configSaveDatas.screenModeType == ScreenMode.Windowed)
         {
             Screen.SetResolution(1280, 720, FullScreenMode.Windowed);
         }
     }
-    void InsideOverwriteVersionData()
-    {
-        Debug.Log(nameof(InsideOverwriteVersionData));
-        int index = versionDatas.FindIndex(r => r.version == selectVersionData.version);
-        if (index != -1)
-        {
-            versionDatas[index] = selectVersionData;
-        }
-        else
-        {
-            versionDatas.Add(selectVersionData);
-        }
-    }
+    
 
 
 

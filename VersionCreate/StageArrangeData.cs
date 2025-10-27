@@ -8,7 +8,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System.Linq;
 using System.IO;
 
@@ -26,31 +26,34 @@ public class StageArrangeData
         {
             Debug.LogError("selectStageData is null. Stage data not found for the selected difficulty and stage key.");
         }
+        this.bgm = selectStageData.bgm;
 
         this.callRuleSchemesByGTime = selectStageData.callRuleSchemesByGTime;
 
         //待優化
         foreach (var item in GameSelect.playerData.playerCallRuleSchemeById)
         {
-            Debug.Log("item:"+item.Print());
+            Debug.Log("item:" + item.Print());
         }
-        var allCallRuleSchemeById = selectStageData.callRuleSchemeById.Concat(GameSelect.playerData.playerCallRuleSchemeById).Concat(GameSelect.powerData.powerCallRuleSchemeById).ToList();  
+        var allCallRuleSchemeById = selectStageData.callRuleSchemeById.Concat(GameSelect.playerData.playerCallRuleSchemeById).Concat(GameSelect.powerData.powerCallRuleSchemeById).ToList();
         foreach (var callRuleScheme in allCallRuleSchemeById)
         {
-            if (callRuleScheme.callExistId == null)
+            var callExistId = callRuleScheme.callExistId;
+            if (InvalidHelper.IsInvalid(callExistId))
             {
                 Debug.LogError("callExistId is null in callRuleScheme. Cannot add to callRulesSchemeDict.");
             }
-            else if (!callRulesSchemesDict.ContainsKey(callRuleScheme.callExistId.Value))
+            else if (!callRulesSchemesDict.ContainsKey(callExistId))
             {
-                this.callRulesSchemesDict.Add(callRuleScheme.callExistId.Value, new List<CallRuleScheme>());
+                this.callRulesSchemesDict.Add(callExistId, new List<CallRuleScheme>());
             }
-            this.callRulesSchemesDict[callRuleScheme.callExistId.Value].Add(callRuleScheme);
+            this.callRulesSchemesDict[callExistId].Add(callRuleScheme);
         }
     }
     public string version;
     public Difficult selectDifficult;
     public uint selectStageKey;
+    public string bgm;
     public List<CallRuleScheme> callRuleSchemesByGTime = new List<CallRuleScheme>();
     public Dictionary<uint, List<CallRuleScheme>> callRulesSchemesDict = new Dictionary<uint, List<CallRuleScheme>>();
 

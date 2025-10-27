@@ -14,17 +14,22 @@ using static PlayerKeyHelper;
 using static SaveJsonData;
 using static GameConfig;
 
-public class ShotUnitCtrl : UnitCtrlBase
+public class EnemyBossUnitCtrl : EnemyUnitCtrl
 {
-    public ShotUnitCtrl(UnitCtrlObj unitCtrlObj) : base(unitCtrlObj)
+    public EnemyBossUnitCtrl(UnitCtrlObj unitCtrlObj) : base(unitCtrlObj)
     {
     }
 
-    public ShotCtrlObj shotCtrlObj
+    public void SetDef()
     {
-        get => (ShotCtrlObj)unitCtrlObj;
-        set => unitCtrlObj = value;
+        var enemyBossUnitProp = unitProp as EnemyBossUnitProp;
+        enemyBossUnitProp.SetDef();
     }
 
-    
+    public void SetKeepData((uint debutNo, uint powerGiveNum) keepData)
+    {
+        this.debutNo = keepData.debutNo;
+        GivePower(keepData.powerGiveNum);
+    }
+
 }

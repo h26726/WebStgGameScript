@@ -4,22 +4,25 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using UnityEngine.UI;
 public class MoveManager
 {
+    public bool isRun = false;
+    public uint coreSettingId;
+    public Vector2 moveVector;
     public SettingBase setting;
     public UnitCtrlObj unitCtrlObj;
     public UnitPropBase unitProp;
     public ActionProp actionProp;
-    public bool isRun = false;
-    public uint coreSettingId;
-    public Vector2 moveVector;
 
-
-    public MoveManager(ActCtrl actCtrl)
+    public MoveManager()
+    {
+        Reset();
+    }
+    public void Set(ActCtrl actCtrl)
     {
         this.isRun = true;
         this.unitProp = actCtrl.unitProp;
@@ -28,12 +31,23 @@ public class MoveManager
         this.setting = actCtrl.setting;
         this.coreSettingId = actCtrl.coreSettingId;
     }
+    public void Reset()
+    {
+        this.isRun = false;
+        this.moveVector = Vector2.zero;
+        this.unitProp = null;
+        this.actionProp = null;
+        this.unitCtrlObj = null;
+        this.setting = null;
+        this.coreSettingId = 0;
+    }
     public void UpdateMove(uint aTime)
     {
         if (setting == null)
             return;
 
-        if (unitProp.rotateIsMoveAngle == true)
+        // 旋轉處理
+        if (unitProp.rotateIsMoveAngle)
         {
             unitCtrlObj.SetRotateZ(actionProp.moveAngle);
         }
@@ -47,29 +61,26 @@ public class MoveManager
             unitCtrlObj.SetChildAddRotateZ(setting.childAddRotateZ);
         }
 
-        if (actionProp.timPosTime != null 
-        // actionProp.timPosPos != null &&
-        // actionProp.timPosMoveDis != null &&
-        // actionProp.timPosSpeedPoint != null &&
-        // actionProp.timPosStartSpeed != null &&
-        // actionProp.timPosEndSpeed != null &&
-        // actionProp.timPosAddSpeed != null
-        )
+        // 計時位置控制
+        var timPosTime = actionProp.timPosTime;
+        if (!InvalidHelper.IsInvalid(timPosTime))
         {
+            var timPosSpeedPoint = actionProp.timPosSpeedPoint;
+            var timPosAddSpeed = actionProp.timPosAddSpeed;
+            var timPosSpeed = actionProp.timPosSpeed;
 
-            if (aTime < actionProp.timPosTime.Value)
+            if (aTime < timPosTime)
             {
-                if ((float)aTime / (float)actionProp.timPosTime.Value < actionProp.timPosSpeedPoint.Value)
-                {
-                    actionProp.timPosSpeed -= actionProp.timPosAddSpeed.Value;
-                }
-                else if ((float)aTime / (float)actionProp.timPosTime.Value > actionProp.timPosSpeedPoint.Value)
-                {
-                    actionProp.timPosSpeed += actionProp.timPosAddSpeed.Value;
-                }
-                actionProp.speed = actionProp.timPosSpeed.Value * 60;
+                float t = (float)aTime / timPosTime;
+
+                if (t < timPosSpeedPoint)
+                    actionProp.timPosSpeed -= timPosAddSpeed;
+                else if (t > timPosSpeedPoint)
+                    actionProp.timPosSpeed += timPosAddSpeed;
+
+                actionProp.speed = timPosSpeed * 60f;
             }
-            else if (aTime == actionProp.timPosTime.Value)
+            else if (aTime == timPosTime)
             {
                 actionProp.speed = 0;
                 actionProp.timPosAddSpeed = 0;
@@ -81,37 +92,38 @@ public class MoveManager
         }
         else
         {
-            if (setting.addSpeed != null)
-            {
-                var addSpeed = setting.addSpeed.Value / 60;
-                actionProp.speed += addSpeed;
-            }
-            if (setting.maxSpeed != null)
-            {
-                if (actionProp.speed > setting.maxSpeed.Value)
-                {
-                    actionProp.speed = setting.maxSpeed.Value;
-                }
-            }
-            if (setting.minSpeed != null)
-            {
-                if (actionProp.speed < setting.minSpeed)
-                {
-                    actionProp.speed = setting.minSpeed.Value;
-                }
-            }
 
+            // 加速度限制處理
+            if (!InvalidHelper.IsInvalid(setting.addSpeed))
+                actionProp.speed += setting.addSpeed * (1f / 60f);
+
+            if (!InvalidHelper.IsInvalid(setting.maxSpeed) && actionProp.speed > setting.maxSpeed)
+                actionProp.speed = setting.maxSpeed;
+
+            if (!InvalidHelper.IsInvalid(setting.minSpeed) && actionProp.speed < setting.minSpeed)
+                actionProp.speed = setting.minSpeed;
+
+            // 角度增量
             if (setting.addMoveAngle != null)
             {
                 var angle = unitCtrlObj.GetAngle(setting.addMoveAngle, out var isNewAngle);
-                if (isNewAngle) actionProp.moveAngle = 0;
-                else angle = angle / 60;
+                if (isNewAngle)
+                    actionProp.moveAngle = 0;
+                else
+                    angle *= 1f / 60f;
+
                 actionProp.moveAngle += angle;
             }
         }
-        moveVector = new Vector2(Mathf.Cos((actionProp.moveAngle) * Mathf.Deg2Rad) * (actionProp.speed / 60), Mathf.Sin((actionProp.moveAngle) * Mathf.Deg2Rad) * (actionProp.speed / 60));
+
+        // 計算移動向量
+        float rad = actionProp.moveAngle * Mathf.Deg2Rad;
+        float speedPerFrame = actionProp.speed * (1f / 60f);
+
+        moveVector.x = Mathf.Cos(rad) * speedPerFrame;
+        moveVector.y = Mathf.Sin(rad) * speedPerFrame;
+
         unitCtrlObj.MoveTranslate(moveVector);
-        unitCtrlObj.AddPrintContent($"moveVector:{moveVector}   {Environment.NewLine}");
     }
 }
 

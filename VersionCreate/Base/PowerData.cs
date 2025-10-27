@@ -8,16 +8,16 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System.Linq;
 using System.IO;
 
 [Serializable]
 public class PowerData
 {
-    public PowerData(string fileName)
+    public void Set(string version, string fileName)
     {
-        var powerXmlStageSettings = XmlStageSettingBuilder.BuildByReadFileName(fileName);
+        var powerXmlStageSettings = XmlStageSettingBuilder.BuildByReadFileName(version, fileName);
         CreateDataBuilder.Build(
             powerXmlStageSettings, out powerCreateStageSettings, out _, out powerCallRuleSchemeById);
     }

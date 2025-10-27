@@ -13,10 +13,24 @@ using static CommonHelper;
 using static PlayerKeyHelper;
 using static SaveJsonData;
 using static GameConfig;
+using static GameMainCtrl;
 
-public class PlayerShotUnitCtrl : ShotUnitCtrl
+public class EnemyBossCollisionCtrl : EnemyCollisionCtrl
 {
-    public PlayerShotUnitCtrl(UnitCtrlObj unitCtrlObj) : base(unitCtrlObj)
+
+    public override void EnemyHpChangeHandler(EnemyUnitProp enemyUnitProp, PlayerShotUnitProp playerShotUnitProp)
     {
+        GameObjCtrl.Instance.UpdateBossHpLine();
+        if (enemyUnitProp.hp == 0)
+        {
+            GameMainCtrl.Instance.gameSceneUpdateFlag |= UpdateFlag.LateSpellEnd;
+        }
+
     }
+
+
+
+
+
+
 }

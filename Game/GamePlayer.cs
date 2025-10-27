@@ -11,16 +11,16 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using System.Linq;
 using static LoadCtrl;
 
 public static class GamePlayer
 {
-    static float _power = 0f;
-    static uint _boom = 0;
-    static uint _life = 0;
+    static float _power;
+    static uint _boom;
+    static uint _life;
 
     public static float power
     {
@@ -52,7 +52,14 @@ public static class GamePlayer
     }
 
     public static PlayerUnitCtrl nowUnit { get; set; }
-    public static bool isContinue { get; set; } = false;
+    public static bool isContinue { get; set; }
+
+    public static void Reset()
+    {
+        nowUnit = null;
+        isContinue = false;
+        SetDef();
+    }
 
     public static void TryRegister(TypeValue type, UnitCtrlBase unitCtrlBase)
     {
@@ -93,8 +100,8 @@ public static class GamePlayer
 
     public static void CoreActionRun()
     {
-        GamePlayer.nowUnit.actCtrlDict[(uint)PlayerAct.UnInvinciblePlayerCtrl].isRun = false;
-        GamePlayer.nowUnit.actCtrlDict[(uint)PlayerAct.Base].Act1_RunAndReset();
+        nowUnit.actCtrlDict[(uint)PlayerAct.UnInvinciblePlayerCtrl].isRun = false;
+        nowUnit.unitProp.propLateCallActs.Add(((uint)PlayerAct.Base, (uint)PlayerAct.Base, null));
     }
 
 

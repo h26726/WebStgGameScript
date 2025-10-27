@@ -4,14 +4,16 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using System.Collections.Generic;
 
+[SerializeField]
 public interface ISelectBaseUpdater
 {
     void UpdateHandler();
+    void Init();
 }
 public abstract class SelectBase<T, TBtn> : SingletonBase<T>, ISelectBaseUpdater
     where T : SelectBase<T, TBtn>
@@ -32,14 +34,10 @@ public abstract class SelectBase<T, TBtn> : SingletonBase<T>, ISelectBaseUpdater
             return btns[nowBtnKey];
         }
     }
-    void Awake()
-    {
-        Init();
-    }
 
-    protected virtual void Init()
+
+    public virtual void Init()
     {
-        LoadCtrl.Instance.selectList.Add(Instance);
         selfAnimator = GetComponent<Animator>();
         canvasGroup = GetComponent<CanvasGroup>();
         var hides = btns.Where(r => r.isHide).ToList();
@@ -59,8 +57,7 @@ public abstract class SelectBase<T, TBtn> : SingletonBase<T>, ISelectBaseUpdater
             LoadCtrl.Instance.SwitchTitleCamera();
         }
         selfAnimator.Play("Show");
-        AutoSelectNextAbleUseBtn(ref nowBtnKey, 0, btns);
-
+        BtnChange(ref nowBtnKey, 0, btns);
     }
 
     public void Hide()
@@ -122,35 +119,35 @@ public abstract class SelectBase<T, TBtn> : SingletonBase<T>, ISelectBaseUpdater
         var upDown = GetKeyOneVal_UpDown(null);
         if (upDown != 0)
         {
-            AutoSelectNextAbleUseBtn(ref nowBtnKey, upDown, btns);
+            BtnChange(ref nowBtnKey, upDown, btns);
         }
     }
 
     protected abstract void ClickHandle();
 
-    void AutoSelectNextAbleUseBtn(ref int _BtnKey, int upDown, OptionBase[] _Btns)
+    protected int AutoNextAbleUseBtnKey(int btnKey, bool direct, OptionBase[] _Btns)
     {
-        if (upDown != 0)
-            _Btns[_BtnKey].animator.Play("Idle");
-        _BtnKey += upDown;
         uint Count = 0;
         while (true)
         {
-            if (_Btns.Length <= _BtnKey)
+            if (_Btns.Length <= btnKey)
             {
-                _BtnKey = 0;
+                btnKey = 0;
             }
-            else if (_BtnKey < 0)
+            else if (btnKey < 0)
             {
-                _BtnKey = _Btns.Length - 1;
+                btnKey = _Btns.Length - 1;
             }
 
 
-            if (!_Btns[_BtnKey].isHide && !_Btns[_BtnKey].isDisable)
+            if (!_Btns[btnKey].isHide && !_Btns[btnKey].isDisable)
             {
                 break;
             }
-            _BtnKey = _BtnKey + upDown;
+            if (direct)
+                btnKey++;
+            else
+                btnKey--;
 
             Count++;
             if (Count > 100)
@@ -159,7 +156,37 @@ public abstract class SelectBase<T, TBtn> : SingletonBase<T>, ISelectBaseUpdater
                 break;
             }
         }
-        _Btns[_BtnKey].animator.Play("Active");
+        return btnKey;
+    }
+
+    public void BtnChange(ref int btnKey, int change, OptionBase[] btns)
+    {
+        var oldBtnKey = btnKey;
+        btnKey += change;
+        btnKey = AutoNextAbleUseBtnKey(btnKey, change >= 0, btns);
+        ActveBtn(oldBtnKey, btnKey, btns);
+    }
+
+    public void BtnChange(ref int btnKey, int newBtnKey, bool direct, OptionBase[] btns)
+    {
+        var oldBtnKey = btnKey;
+        btnKey = newBtnKey;
+        btnKey = AutoNextAbleUseBtnKey(btnKey, direct, btns);
+        ActveBtn(oldBtnKey, btnKey, btns);
+    }
+
+    public void ActveBtn(int oldBtnKey, int newBtnKey, OptionBase[] btns)
+    {
+        if (oldBtnKey != newBtnKey)
+        {
+            btns[oldBtnKey].animator.Play("Idle");
+        }
+        ActveBtn(newBtnKey, btns);
+    }
+
+    public void ActveBtn(int newBtnKey, OptionBase[] btns)
+    {
+        btns[newBtnKey].animator.Play("Active");
     }
 
 

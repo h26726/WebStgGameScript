@@ -6,7 +6,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using System.Collections.Generic;
 public class GameOverSelect : SelectBase<GameOverSelect, TextOption>
@@ -29,7 +29,6 @@ public class GameOverSelect : SelectBase<GameOverSelect, TextOption>
                     break;
                 case TextName.接續生命:
                     Hide();
-                    GamePlayer.SetDef();
                     GamePlayer.isContinue = true;
                     break;
                 case TextName.回到標題:

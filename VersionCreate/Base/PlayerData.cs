@@ -8,16 +8,16 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System.Linq;
 using System.IO;
 
 [Serializable]
 public class PlayerData
 {
-    public PlayerData(string playerFileName)
+    public void Set(string version, string playerFileName)
     {
-        var playerXmlStageSettings = XmlStageSettingBuilder.BuildByReadFileName(playerFileName);
+        var playerXmlStageSettings = XmlStageSettingBuilder.BuildByReadFileName(version, playerFileName);
         CreateDataBuilder.Build(
             playerXmlStageSettings, out var playerAndShotCreateStageSettings, out _, out playerCallRuleSchemeById);
         playerCreateStageSetting = playerAndShotCreateStageSettings.Where(r => r.coreSetting.type == TypeValue.玩家).FirstOrDefault();
@@ -36,7 +36,7 @@ public class PlayerData
         {
             Debug.LogError($"Player Call Rule Scheme not found for {playerFileName}");
         }
-        
+
     }
     public uint Id;
     public CreateStageSetting playerCreateStageSetting = new CreateStageSetting();

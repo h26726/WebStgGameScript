@@ -12,12 +12,12 @@ using UnityEngine.UI;
 using static GameReplay;
 using static CommonHelper;
 using static CreateSettingData;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static EnumData;
 
 public static class StrToValFunc
 {
-    public static void Set(string str, ref Vector2? data)
+    public static void Set(string str, ref Vector2 data)
     {
         if (string.IsNullOrEmpty(str)) return;
 
@@ -44,8 +44,9 @@ public static class StrToValFunc
             TestEnd($"Set:{str}");
         }
 
-        data ??= Vector2.zero;
-        data = new Vector2(data.Value.x + x, data.Value.y + y);
+        data = !InvalidHelper.IsInvalid(data) ? data : Vector2.zero;
+
+        data = new Vector2(data.x + x, data.y + y);
     }
     public static void Set(string str, ref uint[] data)
     {
@@ -88,13 +89,8 @@ public static class StrToValFunc
 
     public static void Set(string str, ref uint data)
     {
+        data = !InvalidHelper.IsInvalid(data) ? data : 0;
         data = Set(str, data);
-    }
-
-    public static void Set(string str, ref uint? data)
-    {
-        data ??= 0;
-        data = Set(str, data.Value);
     }
 
     private static float Set(string str, float original)
@@ -109,19 +105,28 @@ public static class StrToValFunc
 
     public static void Set(string str, ref float data)
     {
+        data = !InvalidHelper.IsInvalid(data) ? data : 0;
         data = Set(str, data);
     }
-    public static void Set(string str, ref float? data)
-    {
-        data ??= 0;
-        data = Set(str, data.Value);
-    }
-    public static void Set(string str, ref bool? data)
+    public static void Set(string str, ref bool data)
     {
         if (str == "") return;
         if (bool.TryParse(str, out var val))
         {
             data = val;
+        }
+        else
+        {
+            TestEnd($"Set:{str}");
+        };
+    }
+
+    public static void Set(string str, ref BoolState data)
+    {
+        if (str == "") return;
+        if (bool.TryParse(str, out var val))
+        {
+            data = val ? BoolState.True : BoolState.False;
         }
         else
         {

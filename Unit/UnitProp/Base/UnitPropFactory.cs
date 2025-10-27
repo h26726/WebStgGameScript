@@ -4,7 +4,7 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using UnityEngine.UI;
@@ -14,7 +14,11 @@ public static class UnitPropFactory
 {
     public static UnitPropBase Create(UnitCtrlBase unitCtrl)
     {
-        if (unitCtrl is EnemyUnitCtrl)
+        if (unitCtrl is EnemyBossUnitCtrl)
+        {
+            return new EnemyBossUnitProp(unitCtrl);
+        }
+        else if (unitCtrl is EnemyUnitCtrl)
         {
             return new EnemyUnitProp(unitCtrl);
         }

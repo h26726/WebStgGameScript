@@ -11,27 +11,55 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using static GameMainCtrl;
 
 public class EnemyCollisionCtrl : CollisionCtrlBase
 {
-    protected void OnTriggerStay2D(Collider2D collision)
+    ContactFilter2D filter;
+    Collider2D myCollider;
+    Collider2D[] results = new Collider2D[20];
+
+    void Start()
     {
-        CollisionHandle(collision);
+        myCollider = GetComponent<Collider2D>();
+        filter = new ContactFilter2D();
+        filter.useTriggers = true; // ✅ 啟用 Trigger 偵測
+        filter.useLayerMask = true;
+        filter.useDepth = false; // 不限制 Depth
+        filter.SetLayerMask(Physics2D.GetLayerCollisionMask(myCollider.gameObject.layer));
+
     }
 
-    protected override void Attacked(UnitCtrlBase opponentUnitCtrl)
+    // protected void OnTriggerStay2D(Collider2D collision)
+    // {
+    //     CollisionHandle(collision);
+    // }
+    public override void UpdateHandler()
     {
-        if (unitCtrl.unitProp.isInvincible)
+        int count = myCollider.OverlapCollider(filter, results);
+        for (int i = 0; i < count; i++)
+        {
+            Collider2D opponentCollision = results[i];
+            if (opponentCollision == null || opponentCollision == myCollider)
+                continue;
+            CollisionHandle(opponentCollision);
+        }
+    }
+
+    protected override void Attacked(UnitPropBase opponentUnitProp)
+    {
+        if (unitProp.isInvincible)
             return;
 
-        opponentUnitCtrl.unitProp.isTriggerDead = true;
-        var enemyUnitCtrl = unitCtrl as EnemyUnitCtrl;
-        if (enemyUnitCtrl != null)
+        var enemyUnitProp = unitProp as EnemyUnitProp;
+        var playerShotUnitProp = opponentUnitProp as PlayerShotUnitProp;
+        if (enemyUnitProp != null && playerShotUnitProp != null)
         {
-            EnemyHpCost(enemyUnitCtrl, (PlayerShotUnitCtrl)opponentUnitCtrl);
+            CostHp(enemyUnitProp, playerShotUnitProp.dmg);
+
+            EnemyHpChangeHandler(enemyUnitProp, playerShotUnitProp);
         }
         else
         {
@@ -39,56 +67,14 @@ public class EnemyCollisionCtrl : CollisionCtrlBase
         }
     }
 
-    public void EnemyHpCost(EnemyUnitCtrl enemyUnitCtrl, PlayerShotUnitCtrl playerShotUnitCtrl)
+    public virtual void EnemyHpChangeHandler(EnemyUnitProp enemyUnitProp, PlayerShotUnitProp playerShotUnitProp)
     {
-        if (playerShotUnitCtrl == null)
+        if (enemyUnitProp.hp == 0)
         {
-            Debug.LogWarning("ShotUnitCtrl is null in HandleAttacked.");
-            return;
+            enemyUnitProp.isTriggerDead = true;
         }
-        var playerShotUnitProp = playerShotUnitCtrl.unitProp as PlayerShotUnitProp;
-        if (playerShotUnitProp == null)
-        {
-            Debug.LogWarning("UnitProp is not of type PlayerShotUnitProp in HandleAttacked.");
-            return;
-        }
-
-        var enemyUnitProp = enemyUnitCtrl.unitProp as EnemyUnitProp;
-        if (enemyUnitProp == null)
-        {
-            Debug.LogWarning("UnitProp is not of type EnemyUnitProp in HandleAttacked.");
-            return;
-        }
-
-        CostHp(enemyUnitProp, playerShotUnitProp.dmg);
-
-        if (enemyUnitCtrl == GameBoss.nowUnit)
-        {
-            // if (BossIsNotHp())
-            //     return;
-            GameObjCtrl.Instance.UpdateBossHpLine();
-            if (enemyUnitProp.hp == 0)
-            {
-                Debug.Log("enemyUnitProp.hp == 0");
-                GameMainCtrl.Instance.gameSceneUpdateFlag |= UpdateFlag.WaitSpellEnd ;
-            }
-        }
-        else
-        {
-            if (enemyUnitProp.hp == 0)
-            {
-                enemyUnitProp.isTriggerDead = true;
-            }
-        }
-
     }
-
-    // bool BossIsNotHp()
-    // {
-    //     return GameSceneValCtrl.Instance.GameSceneValCtrl.Instance.EnemyBossMaxHp == 0;
-    // }
-
-
+    
     public void CostHp(EnemyUnitProp enemyUnitProp, uint dmg)
     {
         var oldHp = enemyUnitProp.hp;

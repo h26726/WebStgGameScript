@@ -11,7 +11,7 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using System.Linq;
 using static LoadCtrl;
@@ -44,32 +44,45 @@ public static class GameSelect
     // 整合載入過需保存的資料
     public static List<StageArrangeData> tmpSaveGameCtrlDatasList = new List<StageArrangeData>();
 
-    public static StageArrangeData gameCtrlDatas = null;
+    public static StageArrangeData gameCtrlData = null;
     //依遊戲時間創造CallRuleScheme資料
+    public static string bgm
+    {
+        get
+        {
+            if (gameCtrlData == null)
+            {
+                Debug.LogError("select gameCtrlDatas is null ");
+                return null;
+            }
+            return gameCtrlData.bgm;
+
+        }
+    }
     public static List<CallRuleScheme> callRuleSchemesByGTime
     {
         get
         {
-            if (gameCtrlDatas == null)
+            if (gameCtrlData == null)
             {
-                Debug.LogError("select gameCtrlDatas is null in gTimeCreateCallRuleSchemes getter.");
+                Debug.LogError("select gameCtrlDatas is null ");
                 return null;
             }
-            return gameCtrlDatas.callRuleSchemesByGTime;
+            return gameCtrlData.callRuleSchemesByGTime;
         }
     }
 
     //依單位ID行動時創造或激活行動資料 
-    public static Dictionary<uint, List<CallRuleScheme>> callRuleSchemeById
+    public static Dictionary<uint, List<CallRuleScheme>> callRuleSchemesById
     {
         get
         {
-            if (gameCtrlDatas == null)
+            if (gameCtrlData == null)
             {
                 Debug.LogError("select gameCtrlDatas is null in gTimeCreateCallRuleSchemes getter.");
                 return null;
             }
-            return gameCtrlDatas.callRulesSchemesDict;
+            return gameCtrlData.callRulesSchemesDict;
         }
     }
     public static PlayerData playerData;
@@ -80,6 +93,23 @@ public static class GameSelect
         {
             return LoadCtrl.Instance.selectVersionData.powerData;
         }
+    }
+
+    public static void Init()
+    {
+        tmpSaveGameCtrlDatasList = new List<StageArrangeData>();
+        Reset();
+    }
+
+    public static void Reset()
+    {
+        difficult = Difficult.Easy;
+        stageKey = GameConfig.GAME_SELECT_STAGE_KEY_DEF;
+        playerId = GameConfig.GAME_SELECT_PLAYER_ID;
+        practiceId = 0;
+        tmpSaveGameCtrlDatasList.Clear();
+        gameCtrlData = null;
+        playerData = null;
     }
 
     public static uint CalArrivePractictTime(uint gTime)
@@ -93,17 +123,18 @@ public static class GameSelect
 
     public static bool CheckNowTimeCallIsPast(uint nowGTimeCallRuleSchemeKey, uint gTime, out uint skipTime)
     {
-        if (callRuleSchemesByGTime[(int)nowGTimeCallRuleSchemeKey].callGameTime == null)
+        var callGameTime = callRuleSchemesByGTime[(int)nowGTimeCallRuleSchemeKey].callGameTime;
+        if (InvalidHelper.IsInvalid(callGameTime))
         {
             Debug.LogError($"nowGTimeCallRuleSchemeKey:{nowGTimeCallRuleSchemeKey} callGameTime is null in CheckNowCallIsPast.");
         }
-        skipTime = callRuleSchemesByGTime[(int)nowGTimeCallRuleSchemeKey].callGameTime.Value;
-        return callRuleSchemesByGTime[(int)nowGTimeCallRuleSchemeKey].callGameTime < gTime;
+        skipTime = callGameTime;
+        return skipTime < gTime;
     }
 
-    public static bool TryGetNowCallData(uint nowGTimeCallRuleSchemeKey, uint gTime, out (CreateStageSetting createStageSetting, uint? baseId, uint? actId) data)
+    public static bool TryGetNowCallData(uint nowGTimeCallRuleSchemeKey, uint gTime, out (CreateStageSetting createStageSetting, uint baseId, uint actId) data)
     {
-        data = (null, null, null);
+        data = (null, GameConfig.UINT_INVAILD, GameConfig.UINT_INVAILD);
         if (nowGTimeCallRuleSchemeKey < callRuleSchemesByGTime.Count && gTime == callRuleSchemesByGTime[(int)nowGTimeCallRuleSchemeKey].callGameTime)
         {
             data = GetNowCallData(nowGTimeCallRuleSchemeKey);
@@ -112,7 +143,7 @@ public static class GameSelect
         return false;
     }
 
-    public static (CreateStageSetting createStageSetting, uint? baseId, uint? actId) GetNowCallData(uint nowGTimeCallRuleSchemeKey)
+    public static (CreateStageSetting createStageSetting, uint baseId, uint actId) GetNowCallData(uint nowGTimeCallRuleSchemeKey)
     {
         var callRuleScheme = callRuleSchemesByGTime[(int)nowGTimeCallRuleSchemeKey];
         return (callRuleScheme.createStageSetting, callRuleScheme.coreId, callRuleScheme.actId);
@@ -129,12 +160,12 @@ public static class GameSelect
         playerData = LoadCtrl.Instance.selectVersionData.playerDatas.FirstOrDefault(r => r.Id == playerId);
         if (tmpSaveGameCtrlDatasList.Any(r => r.selectDifficult == difficult && r.selectStageKey == stageKey))
         {
-            gameCtrlDatas = tmpSaveGameCtrlDatasList.FirstOrDefault(r => r.selectDifficult == difficult && r.selectStageKey == stageKey);
+            gameCtrlData = tmpSaveGameCtrlDatasList.FirstOrDefault(r => r.selectDifficult == difficult && r.selectStageKey == stageKey);
         }
         else
         {
-            gameCtrlDatas = new StageArrangeData(LoadCtrl.Instance.selectVersionData, difficult, stageKey);
-            tmpSaveGameCtrlDatasList.Add(gameCtrlDatas);
+            gameCtrlData = new StageArrangeData(LoadCtrl.Instance.selectVersionData, difficult, stageKey);
+            tmpSaveGameCtrlDatasList.Add(gameCtrlData);
         }
 
         if (!LoadCtrl.Instance.selectVersionData.playerDatas.Any(r => r.Id == playerId))

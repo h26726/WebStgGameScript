@@ -4,7 +4,7 @@ using static CreateSettingData;
 using static CommonHelper;
 using static GameConfig;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using System;
 using System.Linq;
 using UnityEngine.UI;
@@ -19,6 +19,7 @@ public class ActCtrl
     public CallPosManager onCallPosManager;
     public MoveManager onMoveManager;
     public RestoreManager onRestoreManager;
+    public CallRuleCollection callRuleCollection;
     public UnitCtrlObj unitCtrlObj;
     public UnitPropBase unitProp;
     public uint Id { get { return setting.Id; } }
@@ -26,21 +27,85 @@ public class ActCtrl
     public SettingBase setting;
     public ActionProp actionProp;
     public ActionProp parentActionProp;
-    public uint coreSettingId = 0;
-    public List<CallRule> callRules = new List<CallRule>();
-    public bool isRun = false;
-    public bool isBoss = false;
-    public bool isSetActionMoveAngle = false;
+    public uint coreSettingId;
+    public CallRule[] callRules
+    {
+        get
+        {
+            return callRuleCollection.callRules;
+        }
+    }
+    public uint callRulesUseCount
+    {
+        get
+        {
+            return callRuleCollection.useCount;
+        }
+    }
+    public bool isRun;
+    public bool isBoss;
+    public bool isSetActionMoveAngle;
 
-    public ActCtrl Set(UnitCtrlBase unitCtrl, SettingBase setting)
+    public ActCtrl()
+    {
+        actionProp = new ActionProp();
+        callRuleCollection = new CallRuleCollection();
+        actImmediateMachine = new ActImmediateMachine();
+        onWaitBirthAniManager = new WaitBirthAniManager();
+        onATimeManager = new ATimeManager();
+        onCallTimeManager = new CallTimeManager();
+        onCallPosManager = new CallPosManager();
+        onMoveManager = new MoveManager();
+        onRestoreManager = new RestoreManager();
+        Reset();
+    }
+
+    public void Reset()
+    {
+        coreSettingId = 0;
+        unitCtrlObj = null;
+        unitProp = null;
+        setting = null;
+        isBoss = false;
+        actionProp.Reset();
+        ResetCtrl();
+    }
+    public void ResetCtrl()
+    {
+        isRun = false;
+        isSetActionMoveAngle = false;
+        parentActionProp = null;
+        // callRuleCollection = new CallRuleCollection();
+        // actImmediateMachine = new ActImmediateMachine();
+        // onWaitBirthAniManager = new WaitBirthAniManager();
+        // onATimeManager = new ATimeManager();
+        // onCallTimeManager = new CallTimeManager();
+        // onCallPosManager = new CallPosManager();
+        // onMoveManager = new MoveManager();
+        // onRestoreManager = new RestoreManager();
+        callRuleCollection.Reset();
+        actImmediateMachine.Reset();
+        onWaitBirthAniManager.Reset();
+        onATimeManager.Reset();
+        onCallTimeManager.Reset();
+        onCallPosManager.Reset();
+        onMoveManager.Reset();
+        onRestoreManager.Reset();
+    }
+
+
+    public void Set(UnitCtrlBase unitCtrl, SettingBase setting)
     {
         this.coreSettingId = unitCtrl.coreSetting.Id;
         this.unitCtrlObj = unitCtrl.unitCtrlObj;
         this.unitProp = unitCtrl.unitProp;
         this.setting = setting;
         this.isBoss = unitCtrl == GameBoss.nowUnit;
-
-        return this;
+        if (this.isBoss)
+        {
+            var enemyBossUnitProp = unitProp as EnemyBossUnitProp;
+            enemyBossUnitProp.SetDef();
+        }
     }
 
     bool CheckNeedBirthAni()
@@ -48,12 +113,12 @@ public class ActCtrl
         if (!(unitCtrlObj is ShotCtrlObj))
             return false;
         var shotCtrlObj = (ShotCtrlObj)unitCtrlObj;
-        return coreSettingId == setting.Id && setting.birthDurTime != 0f && shotCtrlObj.CheckBirthAninExist();
+        return coreSettingId == setting.Id && setting.birthDurTime != 0f && shotCtrlObj.CheckBirthAnimExist();
     }
 
     public void UpdateHandler()
     {
-        if (onWaitBirthAniManager != null && onWaitBirthAniManager.isRun)
+        if (onWaitBirthAniManager.isRun)
         {
             onWaitBirthAniManager.UpdateFadeIn();
             if (!onWaitBirthAniManager.isRun)
@@ -71,28 +136,28 @@ public class ActCtrl
 
         if (!onATimeManager.isRun)
         {
-            this.isRun = false;
+            ResetCtrl();
             return;
         }
 
         onATimeManager.UpdateAddCount();
 
-        if (onRestoreManager != null && onRestoreManager.isRun)
+        if (onRestoreManager.isRun)
         {
             onRestoreManager.UpdateTryRestore(onATimeManager.aTime);
         }
 
-        if (onMoveManager != null && onMoveManager.isRun)
+        if (onMoveManager.isRun)
         {
             onMoveManager.UpdateMove(onATimeManager.aTime);
         }
 
-        if (onCallTimeManager != null && onCallTimeManager.isRun)
+        if (onCallTimeManager.isRun)
         {
             onCallTimeManager.UpdateCall(onATimeManager.aTime);
         }
 
-        if (onCallPosManager != null && onCallPosManager.isRun)
+        if (onCallPosManager.isRun)
         {
             onCallPosManager.UpdateCall(onATimeManager.aTime);
         }
@@ -124,16 +189,11 @@ public class ActCtrl
     //parentActCtrl 繼承actionProp.moveAngle actionProp.speed
     public void Act1_RunAndReset(ActionProp parentActionProp = null)
     {
+        ResetCtrl();
         this.isRun = true;
         this.parentActionProp = parentActionProp;
-        this.actImmediateMachine = null;
-        this.onWaitBirthAniManager = null;
-        this.onATimeManager = null;
-        this.onMoveManager = null;
-        this.onCallTimeManager = null;
-        this.onCallPosManager = null;
 
-        this.callRules = CallRuleFactory.CreateCallRules(this); //撈出行動觸發執行資料(所有受該行動ID影響的) 整理判斷時間與判斷位置
+        this.callRuleCollection.Set(this); //撈出行動觸發執行資料(所有受該行動ID影響的) 整理判斷時間與判斷位置
 
 
         Act2_RunImmediate();
@@ -141,12 +201,7 @@ public class ActCtrl
 
     public void Act2_RunImmediate()
     {
-        if (isBoss)
-        {
-            var enemyUnitProp = unitProp as EnemyUnitProp;
-            enemyUnitProp.isBoss = true;
-        }
-        actImmediateMachine = new ActImmediateMachine(this);
+        actImmediateMachine.Set(this); ;
         actImmediateMachine.Run();
         Act3_OnWaitBirth();
     }
@@ -156,14 +211,14 @@ public class ActCtrl
     {
         if (CheckNeedBirthAni())
         {
-            onWaitBirthAniManager = new WaitBirthAniManager(this);
+            onWaitBirthAniManager.SetAndPlay(this);
             return;
         }
         Act4_PlayAni();
     }
     public void Act4_PlayAni()
     {
-        if (setting.ani != null)
+        if (!InvalidHelper.IsInvalid(setting.ani))
         {
             unitCtrlObj.PlayAniName(setting.ani);
         }
@@ -177,9 +232,9 @@ public class ActCtrl
     public void Act5_InitActionProp()
     {
         if (parentActionProp == null)
-            actionProp = new ActionProp(unitCtrlObj, setting, 0, 0);
+            actionProp.Set(unitCtrlObj, setting, 0, 0);
         else
-            actionProp = new ActionProp(
+            actionProp.Set(
                 unitCtrlObj,
                 setting,
                 parentActionProp.moveAngle,
@@ -195,11 +250,11 @@ public class ActCtrl
     {
         unitProp.isAllowCollision = true;
         isSetActionMoveAngle = true;
-        onATimeManager = new ATimeManager(this, isBoss);
-        onMoveManager = new MoveManager(this);
-        onCallTimeManager = new CallTimeManager(this);
-        onCallPosManager = new CallPosManager(this);
-        onRestoreManager = new RestoreManager(this);
+        onATimeManager.Set(this, isBoss);
+        onMoveManager.Set(this);
+        onCallTimeManager.Set(this);
+        onCallPosManager.Set(this);
+        onRestoreManager.Set(this);
 
     }
 }

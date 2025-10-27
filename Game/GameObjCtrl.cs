@@ -11,10 +11,11 @@ using static EnumData;
 using static CreateSettingData;
 using static CommonHelper;
 using static PlayerKeyHelper;
-using static PlayerSaveData;
+using static SaveJsonData;
 using static GameConfig;
 using System.Linq;
 using static LoadCtrl;
+using System.Text;
 
 public partial class GameObjCtrl : SingletonBase<GameObjCtrl>
 {
@@ -35,6 +36,24 @@ public partial class GameObjCtrl : SingletonBase<GameObjCtrl>
     public Text dialogBoxText;
     public Animator dialogBoxAnimator;
 
+    public void Reset()
+    {
+        scoreText.text = "";
+        powerText.text = "";
+        gameLog.text = "";
+        if (nowSpellBg != null)
+            nowSpellBg.SetActive(false);
+        nowSpellBg = null;
+        spellCardNameAnimator.gameObject.SetActive(false);
+        spellCardNameText.text = "";
+        spellTime.text = "";
+        ClearBossHpLine();
+        dialogBox.SetActive(false);
+        DialogChangeText("");
+        DialogCloseText();
+        if (!dialogBoxAnimator.GetCurrentAnimatorStateInfo(0).IsName("Hide")) dialogBoxAnimator.Play("Hide");
+    }
+
     public void StopSpell()
     {
         if (nowSpellBg != null)
@@ -46,10 +65,12 @@ public partial class GameObjCtrl : SingletonBase<GameObjCtrl>
 
     public void OpenSpell(SettingBase spellSetting)
     {
-        if(string.IsNullOrEmpty(spellSetting.name))
+        if (InvalidHelper.IsInvalid(spellSetting.name))
             return;
-        Animator animator = LoadCtrl.Instance.pool.spellDict[spellSetting.spellAni][0];
-        nowSpellBg = LoadCtrl.Instance.pool.spellDict[spellSetting.spellAni][1].transform.gameObject;
+        var pool = LoadCtrl.Instance.pool;
+        var spell = pool.spellDict[spellSetting.spellAni];
+        Animator animator = spell[0];
+        nowSpellBg = spell[1].transform.gameObject;
         nowSpellBg.SetActive(true);
         if (IS_OPEN_SPELLIMG)
         {
@@ -76,30 +97,40 @@ public partial class GameObjCtrl : SingletonBase<GameObjCtrl>
             BoomObj.gameObject.SetActive(i < GamePlayer.boom);
         }
     }
+    private readonly StringBuilder powerSb = new(8); // 共用緩衝區，避免重複配置
 
     public void UpdatePlayerPower()
     {
+        var text = GameObjCtrl.Instance.powerText;
+
         if (GamePlayer.power == GameConfig.PLAYER_MAX_POWER)
         {
-            GameObjCtrl.Instance.powerText.text = "MAX";
+            text.text = "MAX";
         }
         else
         {
-            GameObjCtrl.Instance.powerText.text = GamePlayer.power.ToString("F1");
+            powerSb.Clear();
+            // 將格式化結果寫入 StringBuilder
+            powerSb.AppendFormat("{0:F1}", GamePlayer.power);
+            text.text = powerSb.ToString();
         }
     }
 
+    private readonly StringBuilder spellTimeSb = new(8);
     public void UpdateSpellTimeText()
     {
         var nowEnemyBoss = GameBoss.nowUnit;
-        float totalSpellTime = GameBoss.SpellTime;
-        float usedSpellTime = nowEnemyBoss.uTime;
-        spellTime.text = MathF.Floor((totalSpellTime - usedSpellTime) / 60).ToString();
+        float remain = (GameBoss.SpellTime - nowEnemyBoss.uTime) / 60f;
+        int floorTime = (int)MathF.Floor(remain);
+
+        spellTimeSb.Clear();
+        spellTimeSb.Append(floorTime);
+        spellTime.text = spellTimeSb.ToString();
     }
 
     public void UpdateBossHpLine()
     {
-        var  nowEnemyBoss = GameBoss.nowUnit;
+        var nowEnemyBoss = GameBoss.nowUnit;
         uint maxHp = GameBoss.MaxHp;
         uint nowHp = nowEnemyBoss.enemyProp.hp;
         bossHpLine.localScale = new Vector2((float)nowHp / (float)maxHp * 65f, bossHpLine.localScale.y);
@@ -117,7 +148,7 @@ public partial class GameObjCtrl : SingletonBase<GameObjCtrl>
 
     public void UpdateScoreText()
     {
-        scoreText.text = PlayerSaveData.score.ToString().PadLeft(8, '0');
+        scoreText.text = SaveJsonData.score.ToString().PadLeft(8, '0');
     }
 
     public void ShowDialogBox()
@@ -126,7 +157,17 @@ public partial class GameObjCtrl : SingletonBase<GameObjCtrl>
         dialogBoxAnimator.Play("Show");
     }
 
-    public void DialogBoxChangeText(string dialogText)
+    public void DialogOpenText()
+    {
+        dialogBoxText.enabled = true;
+    }
+
+    public void DialogCloseText()
+    {
+        dialogBoxText.enabled = false;
+    }
+
+    public void DialogChangeText(string dialogText)
     {
         dialogBoxText.text = dialogText;
     }

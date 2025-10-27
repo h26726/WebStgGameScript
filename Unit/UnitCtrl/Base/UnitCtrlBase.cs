@@ -14,27 +14,50 @@ using System.IO;
 
 public abstract partial class UnitCtrlBase
 {
-    public UnitCtrlObj unitCtrlObj { get; set; }
+    public string externalPoolName { get; set; }
     public enum UpdateFlag
     {
         None = 0,
         OutToInBorder = 1 << 0,
         InToOutBorder = 1 << 1,
-        WaitDead = 1 << 2,
+        WaitDeadAni = 1 << 2,
     }
-    UpdateFlag updateFlag = UpdateFlag.None;
-    public UnitPropBase unitProp { get; set; }
-
-
-    public string externalPoolName { get; set; }
+    public uint Id { get; set; }
+    public uint uTime { get; set; }
     public uint debutNo { get; set; }
     public uint endDeadAniTime { get; set; }
+    protected UpdateFlag updateFlag;
+
+    public ActCtrl[] actCtrls;
+    public uint actCtrlsUseCount;
+    public Dictionary<uint, ActCtrl> actCtrlDict;
+    public CollisionCtrlBase collisionCtrl { get; set; }
+    public UnitCtrlObj unitCtrlObj { get; set; }
+    public UnitPropBase unitProp { get; set; }
+    public UnitCtrlBase parentUnitCtrl { get; set; }
+    public CreateStageSetting createStageSetting { get; set; }
+    // public UnitPropBase unitProp { get; set; }
+    public SettingBase coreSetting { get { return createStageSetting.coreSetting; } }
+
+
+
+
+
 
 
 
     public UnitCtrlBase(UnitCtrlObj unitCtrlObj)
     {
         this.unitCtrlObj = unitCtrlObj;
+        actCtrls = new ActCtrl[10];
+        for (int i = 0; i < actCtrls.Length; i++)
+        {
+            actCtrls[i] = new ActCtrl();
+        }
+        unitProp = UnitPropFactory.Create(this);
+        collisionCtrl = unitCtrlObj.collisionCtrl;
+        collisionCtrl.Init(this);
+        actCtrlDict = new Dictionary<uint, ActCtrl>();
         Reset();
     }
 
@@ -42,27 +65,34 @@ public abstract partial class UnitCtrlBase
     // public bool isDeadQueue { get; set; }
     public void Reset()
     {
-        updateFlag |= UpdateFlag.None;
+        Id = 0;
+        debutNo = uint.MaxValue;
         uTime = 0;
+        endDeadAniTime = 0;
+        updateFlag = UpdateFlag.None;
         parentUnitCtrl = null;
         createStageSetting = null;
         actCtrlDict.Clear();
-        if (unitProp == null)
-            unitProp = UnitPropFactory.Create(this);
         unitProp.Reset();
         unitCtrlObj.Reset();
+        for (int i = 0; i < actCtrlsUseCount; i++)
+        {
+            actCtrls[i].Reset();
+        }
+        actCtrlsUseCount = 0;
+
+        if (this == GamePlayer.nowUnit)
+        {
+            GamePlayer.nowUnit.PlayerReset();
+        }
     }
 
-    public UnitCtrlBase parentUnitCtrl { get; set; }
-    public CreateStageSetting createStageSetting { get; set; }
-    public Dictionary<uint, ActCtrl> actCtrlDict = new Dictionary<uint, ActCtrl>();
-    // public UnitPropBase unitProp { get; set; }
-    public SettingBase coreSetting { get { return createStageSetting.coreSetting; } }
+    public (uint debutNo, uint powerGiveNum) KeepData()
+    {
+        return (debutNo, !InvalidHelper.IsInvalid(coreSetting.powerGive) ? coreSetting.powerGive : 0);
+    }
 
-    public Transform childFrame { get; set; }
 
-    public uint uTime { get; set; }
-    public bool isRun { get; set; }
 
 
 
@@ -92,6 +122,7 @@ public abstract partial class UnitCtrlBase
                 }
             }
         }
+        collisionCtrl.UpdateHandler();
     }
 
 
@@ -102,8 +133,9 @@ public abstract partial class UnitCtrlBase
         {
             Unit3_TriggerDead_OnWaitAni();
         }
-        else if (updateFlag.HasFlag(UpdateFlag.WaitDead) && GameReplay.keyPressTime == endDeadAniTime)
+        else if (updateFlag.HasFlag(UpdateFlag.WaitDeadAni) && GameReplay.keyPressTime == endDeadAniTime)
         {
+            endDeadAniTime = 0;
             unitProp.isTriggerRestore = true;
             // DeadAnimEndHandle();
         }
@@ -125,17 +157,28 @@ public abstract partial class UnitCtrlBase
     {
         this.createStageSetting = createStageSetting;
         unitCtrlObj.Set_zIndex_zCode(createStageSetting.Id);
-
-        this.actCtrlDict = ActCtrlFactory.CreateActCtrlDict(this);
+        SetActCtrlsAndDict();
         SetParent(parentUnitCtrl);
 
 
-        if (this != GameBoss.nowUnit && this != GamePlayer.nowUnit && unitProp.restoreDistance < GameConfig.RESTORE_DISTANCE_MAX)
+        if (CheckEnableBorderRestore())
         {
+            Debug.Log("CheckEnableBorderRestore");
             updateFlag |= UpdateFlag.OutToInBorder;
         }
         unitCtrlObj.EnableUnit();
         Unit2_TriggerCoreAct();
+    }
+
+    bool CheckEnableBorderRestore()
+    {
+        if (this == GameBoss.nowUnit)
+            return false;
+        if (this == GamePlayer.nowUnit)
+            return false;
+        if (!InvalidHelper.IsInvalid(unitProp.restoreDistance) && unitProp.restoreDistance > GameConfig.RESTORE_DISTANCE_MAX)
+            return false;
+        return true;
     }
 
     void SetParent(UnitCtrlBase parentUnitCtrl)
@@ -151,7 +194,7 @@ public abstract partial class UnitCtrlBase
     {
         if (actCtrlDict.ContainsKey(coreSetting.Id))
         {
-            unitProp.propWaitCallActs.Add((coreSetting.Id, coreSetting.Id, null));
+            unitProp.propLateCallActs.Add((coreSetting.Id, coreSetting.Id, null));
             // actCtrlDict[coreSetting.Id].Act1_RunAndReset();
         }
         else
@@ -186,7 +229,7 @@ public abstract partial class UnitCtrlBase
         unitProp.isAllowCollision = false;
         unitCtrlObj.PlayDeadAni();
         endDeadAniTime = GameReplay.keyPressTime + DEFAULT_DEADANI_KEY_TIME;
-        updateFlag |= UpdateFlag.WaitDead;
+        updateFlag |= UpdateFlag.WaitDeadAni;
         if (this == GamePlayer.nowUnit)
         {
             endDeadAniTime = GameReplay.keyPressTime + DEFAULT_PLAYER_DEADANI_KEY_TIME;
@@ -240,6 +283,22 @@ public abstract partial class UnitCtrlBase
     {
         // Debug.Log(nameof(TriggerRestore));
         GameDebut.AddQueueRestore(this);
+    }
+
+    void SetActCtrlsAndDict()
+    {
+        var coreActCtrl = actCtrls[0];
+        coreActCtrl.Set(this, coreSetting);
+        actCtrlDict[coreActCtrl.Id] = coreActCtrl;
+        actCtrlsUseCount++;
+        for (int i = 0; i < createStageSetting.actionSettingList.Count; i++)
+        {
+            var setting = createStageSetting.actionSettingList[i];
+            var actCtrl = actCtrls[actCtrlsUseCount];
+            actCtrl.Set(this, setting);
+            actCtrlDict[actCtrl.Id] = actCtrl;
+            actCtrlsUseCount++;
+        }
     }
 
 
